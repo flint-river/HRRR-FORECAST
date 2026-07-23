@@ -225,6 +225,12 @@ button,select,input[type=text]{font-family:var(--mono);font-size:12px}
 .prow select{min-width:330px;flex:1 1 auto;max-width:520px}
 .prow input{width:190px}
 .prow.off{opacity:.34}
+.vflag{
+  font-family:var(--mono);font-size:11px;padding:5px 9px;border-radius:2px;
+  border:1px solid var(--rule);color:var(--dim);white-space:nowrap;
+}
+.vflag.yes{border-color:var(--green);color:var(--green)}
+.vflag.no{border-color:var(--amber);color:var(--amber)}
 .chip.sit{border-color:var(--rule);color:var(--text)}
 .chip.sit:hover{border-color:var(--amber);color:var(--amber)}
 
@@ -296,6 +302,14 @@ button,select,input[type=text]{font-family:var(--mono);font-size:12px}
   <div class="bay" id="bay-wrap"><div class="bay-scroll" id="bay"></div></div>
 
   <div class="deck" id="deck">
+    <div class="grp">
+      <span class="grp-k">Model / area</span>
+      <div class="row">
+        <select class="sel" id="i-modelsel" aria-label="Model" style="min-width:230px"></select>
+        <select class="sel" id="i-areasel" aria-label="Area"></select>
+      </div>
+    </div>
+
     <div class="grp">
       <span class="grp-k">Transport</span>
       <div class="row">
@@ -406,12 +420,16 @@ button,select,input[type=text]{font-family:var(--mono);font-size:12px}
 
       <div class="row" style="flex-wrap:wrap;gap:14px;align-items:flex-end">
         <div class="grp">
-          <span class="grp-k">Model</span>
-          <input class="num" style="width:110px" type="text" id="i-model" value="hrrr">
+          <span class="grp-k">Model id (path segment)</span>
+          <input class="num" style="width:130px" type="text" id="i-model" value="hrrr">
         </div>
         <div class="grp">
-          <span class="grp-k">Area</span>
-          <input class="num" style="width:110px" type="text" id="i-area" value="conus">
+          <span class="grp-k">Area id</span>
+          <input class="num" style="width:130px" type="text" id="i-area" value="conus">
+        </div>
+        <div class="grp">
+          <span class="grp-k">&nbsp;</span>
+          <span class="vflag" id="s-verified">&nbsp;</span>
         </div>
       </div>
 
@@ -522,7 +540,7 @@ var DEFAULT_LATENCY_MIN = 120;
 /* Bumped whenever the shipped template changes. Saved settings and shared links
    carry this stamp; anything older has its template discarded rather than
    allowed to override a fix. Everything else the user chose is kept. */
-var CFG_VERSION = 4;
+var CFG_VERSION = 5;
 
 var BUILTIN_PRESETS = [
   { name:"NCEP MAG - HRRR CONUS", tpl:DEFAULT_TPL, model:"hrrr", area:"conus",
@@ -535,68 +553,6 @@ var BUILTIN_PRESETS = [
     params:["10m_wnd_precip","500_vort_ht","850_temp_ht","250_wnd_ht"] },
   { name:"Blank - build your own", tpl:"", model:"", area:"", params:["","","",""] }
 ];
-
-/* NCEP MAG HRRR CONUS product catalog, read off the live MAG product page.
-   Grouped the way MAG groups it, with MAG's own product descriptions. */
-var CATALOG = [
-  ["Precipitation", [
-    ["precip_p01","Hourly total precipitation"],
-    ["precip_rate","Precipitation rate"],
-    ["precip_rate_type","Precipitation rate and type"],
-    ["precip_ptot","Total accumulated precipitation"],
-    ["snow_total","Total accumulated snowfall"],
-    ["sim_radar_1km","Simulated radar reflectivity, 1 km"],
-    ["sim_radar_comp","Simulated composite radar reflectivity"],
-    ["sim_radar_max","Max simulated radar reflectivity"]
-  ]],
-  ["Surface layer", [
-    ["ceiling","Cloud ceiling"],
-    ["vis","Visibility"],
-    ["echo_top","Echo tops"],
-    ["lightning","Lightning flash rate"],
-    ["10m_wnd","10 m wind"],
-    ["10m_maxwnd","Max 10 m wind speed"],
-    ["10m_wnd_sfc_gust","10 m wind gust"],
-    ["2m_temp_10m_wnd","2 m temperature and 10 m wind"],
-    ["2m_dewp_10m_wnd","2 m dew point and 10 m wind"],
-    ["sfc_cape_cin","Surface-based CAPE and CIN"],
-    ["best_cape_cin","Most unstable CAPE and CIN"],
-    ["helicity_1km","0-1 km helicity and storm motion"],
-    ["helicity_3km","0-3 km helicity and storm motion"],
-    ["max_updraft_hlcy","Max 2-5 km updraft helicity"],
-    ["accu_max_updraft_hlcy","Accumulated max 2-5 km updraft helicity"],
-    ["850_temp_mslp_precip","MSLP, 850 mb temperature, hourly precipitation"],
-    ["1000_500_thick","PMSL, 1000-500 mb thickness, hourly precipitation"],
-    ["1000_850_thick","PMSL, 1000-850 mb thickness, hourly precipitation"],
-    ["850_700_thick","PMSL, 850-700 mb thickness, hourly precipitation"]
-  ]],
-  ["Upper air", [
-    ["250_wnd","250 mb wind"],
-    ["300_wnd","300 mb wind"],
-    ["500_vort_ht","500 mb vorticity, wind, height"],
-    ["500_temp_ht","500 mb temperature, wind, height"],
-    ["700_rh_ht","700 mb relative humidity, wind, height, omega"],
-    ["850_temp_ht","850 mb temperature, wind, height"],
-    ["925_temp_wnd","925 mb temperature and wind"]
-  ]]
-];
-
-/* Four-panel sets built around the question actually being asked on the desk. */
-var SITUATIONS = [
-  ["Convective", ["sim_radar_comp","echo_top","sfc_cape_cin","lightning"]],
-  ["Terminal",   ["ceiling","vis","10m_wnd_sfc_gust","precip_rate_type"]],
-  ["Winter",     ["precip_rate_type","snow_total","2m_temp_10m_wnd","1000_500_thick"]],
-  ["Enroute",    ["250_wnd","300_wnd","500_vort_ht","700_rh_ht"]],
-  ["Wind",       ["10m_wnd","10m_maxwnd","10m_wnd_sfc_gust","2m_temp_10m_wnd"]]
-];
-
-function catalogHas(name){
-  for(var i=0;i<CATALOG.length;i++){
-    var items = CATALOG[i][1];
-    for(var j=0;j<items.length;j++){ if(items[j][0] === name){ return true; } }
-  }
-  return false;
-}
 
 /* ============================================================
    state
@@ -637,10 +593,6 @@ function etLabel(d){
     }).format(d) + " ET";
   } catch(e){ return ""; }
 }
-/* HRRR runs to F48 on the 00/06/12/18Z cycles, F18 on all others */
-function maxFH(cycle){
-  return (cycle && cycle.getUTCHours() % 6 === 0) ? 48 : 18;
-}
 
 /* ============================================================
    template substitution
@@ -672,6 +624,7 @@ function buildUrl(fh,param,cycle){
     HH: pad(cycle.getUTCHours(),2),
     FH: String(fh), FH2: pad(Math.floor(fh),2), FH3: pad(Math.floor(fh),3),
     FHM: fhm(fh),
+    FHTOK: (currentModel().fhTok === "FHM") ? fhm(fh) : pad(Math.floor(fh),3),
     MODEL: $("i-model").value.trim(),
     AREA: $("i-area").value.trim(),
     PARAM: param,
@@ -706,8 +659,10 @@ function latencyMin(){
 function newestPlausibleCycle(){
   var t = Date.now() - latencyMin()*60000;
   var d = new Date(t);
-  return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(),
-                           d.getUTCDate(), d.getUTCHours()));
+  var h = d.getUTCHours();
+  var step = currentModel().cyc || 1;
+  h = Math.floor(h/step)*step;          /* GFS only runs 00/06/12/18 */
+  return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), h));
 }
 
 function detectLatest(){
@@ -726,7 +681,7 @@ function detectLatest(){
       $("drawer").open = true;
       return;
     }
-    var t = new Date(c.getTime() - back*3600000);
+    var t = new Date(c.getTime() - back*(currentModel().cyc||1)*3600000);
     probeImage(buildUrl(PROBE_FH, PROBE_PARAM, t), function(good){
       if(good){ useCycle(t); verifyAge(t); }
       else { back++; setStatus("s-runsub","checking -"+back+"h"); step(); }
@@ -768,7 +723,7 @@ function verifyAge(cycle){
 
 function useCycle(c){
   S.cycle = c;
-  S.prevCycle = new Date(c.getTime() - 3600000);
+  S.prevCycle = new Date(c.getTime() - (currentModel().cyc||1)*3600000);
   fillCycleSelect();
   var age = Math.round((Date.now() - c.getTime())/60000);
   setStatus("s-runsub", "cycle +" + age + " min");
@@ -778,7 +733,7 @@ function useCycle(c){
 
 function useCycleQuiet(c){
   S.cycle = c;
-  S.prevCycle = new Date(c.getTime() - 3600000);
+  S.prevCycle = new Date(c.getTime() - (currentModel().cyc||1)*3600000);
   fillCycleSelect();
   setStatus("s-runsub","from pasted URL");
 }
@@ -787,12 +742,14 @@ function fillCycleSelect(){
   var sel = $("i-cycle");
   sel.innerHTML = "";
   if(!S.cycle){ return; }
+  var iv = (currentModel().cyc || 1);
   for(var i=0;i<24;i++){
-    var c = new Date(S.cycle.getTime() - i*3600000);
+    var c = new Date(S.cycle.getTime() - i*iv*3600000);
     var o = el("option");
     o.value = String(c.getTime());
     o.textContent = pad(c.getUTCMonth()+1,2)+"/"+pad(c.getUTCDate(),2)+" "+
-                    pad(c.getUTCHours(),2)+"Z" + (maxFH(c)===48 ? "  (F48)" : "");
+                    pad(c.getUTCHours(),2)+"Z" +
+                    (maxFH(c) > currentModel().maxFH ? "  (F"+maxFH(c)+")" : "");
     if(i===0){ o.selected = true; }
     sel.appendChild(o);
   }
@@ -802,6 +759,309 @@ function clampRange(){
   var m = maxFH(S.cycle);
   var f1 = parseInt($("i-f1").value,10);
   if(isNaN(f1) || f1 > m){ $("i-f1").value = String(m); }
+}
+
+/* ============================================================
+   model registry
+
+   Path shapes and product lists below were read off MAG's own pages.
+   VERIFIED means an actual image URL or product list was confirmed:
+     hrrr/conus  - image URL confirmed, hhhmm forecast field
+     rap/namer   - product list confirmed
+     gfs/namer   - product list confirmed, nested area/param directories
+   Everything else is a reasonable extrapolation of the same scheme and is
+   labelled as unconfirmed in the UI. When one is wrong, READ BACK on a real
+   MAG image URL corrects it and the result is remembered for that model.
+   ============================================================ */
+var TPL_FLAT   = "https://mag.ncep.noaa.gov/data/{MODEL}/{HH}/{MODEL}_{AREA}_{FHTOK}_{PARAM}{SIZE}.gif";
+var TPL_NESTED = "https://mag.ncep.noaa.gov/data/{MODEL}/{HH}/{AREA}/{PARAM}/{MODEL}_{AREA}_{FHTOK}_{PARAM}{SIZE}.gif";
+
+/* product groups shared by several models, spelled per that model's page */
+var CAT_HRRR = [
+  ["Precipitation", [
+    ["precip_p01","Hourly total precipitation"],
+    ["precip_rate","Precipitation rate"],
+    ["precip_rate_type","Precipitation rate and type"],
+    ["precip_ptot","Total accumulated precipitation"],
+    ["snow_total","Total accumulated snowfall"],
+    ["sim_radar_1km","Simulated radar reflectivity, 1 km"],
+    ["sim_radar_comp","Simulated composite radar reflectivity"],
+    ["sim_radar_max","Max simulated radar reflectivity"]
+  ]],
+  ["Surface layer", [
+    ["ceiling","Cloud ceiling"],
+    ["vis","Visibility"],
+    ["echo_top","Echo tops"],
+    ["lightning","Lightning flash rate"],
+    ["10m_wnd","10 m wind"],
+    ["10m_maxwnd","Max 10 m wind speed"],
+    ["10m_wnd_sfc_gust","10 m wind gust"],
+    ["2m_temp_10m_wnd","2 m temperature and 10 m wind"],
+    ["2m_dewp_10m_wnd","2 m dew point and 10 m wind"],
+    ["sfc_cape_cin","Surface-based CAPE and CIN"],
+    ["best_cape_cin","Most unstable CAPE and CIN"],
+    ["helicity_1km","0-1 km helicity and storm motion"],
+    ["helicity_3km","0-3 km helicity and storm motion"],
+    ["max_updraft_hlcy","Max 2-5 km updraft helicity"],
+    ["accu_max_updraft_hlcy","Accumulated max updraft helicity"],
+    ["850_temp_mslp_precip","MSLP, 850 mb temperature, hourly precipitation"],
+    ["1000_500_thick","PMSL, 1000-500 mb thickness, precipitation"],
+    ["1000_850_thick","PMSL, 1000-850 mb thickness, precipitation"],
+    ["850_700_thick","PMSL, 850-700 mb thickness, precipitation"]
+  ]],
+  ["Upper air", [
+    ["250_wnd","250 mb wind"],
+    ["300_wnd","300 mb wind"],
+    ["500_vort_ht","500 mb vorticity, wind, height"],
+    ["500_temp_ht","500 mb temperature, wind, height"],
+    ["700_rh_ht","700 mb relative humidity, wind, height, omega"],
+    ["850_temp_ht","850 mb temperature, wind, height"],
+    ["925_temp_wnd","925 mb temperature and wind"]
+  ]]
+];
+
+var CAT_RAP = [
+  ["Precipitation", [
+    ["precip_p01","Hourly total precipitation"],
+    ["precip_ptot","Total accumulated precipitation"],
+    ["precip_rate","Precipitation rate"],
+    ["snow_total","Total accumulated snowfall"],
+    ["sim_radar_comp","Simulated composite radar reflectivity"]
+  ]],
+  ["Surface layer", [
+    ["vis","Visibility"],
+    ["10m_wnd_sfc_gust","10 m wind gust"],
+    ["2m_temp_10m_wnd","2 m temperature and 10 m wind"],
+    ["2m_dewp_10m_wnd","2 m dew point and 10 m wind"],
+    ["cape_cin","CAPE and convective inhibition"],
+    ["helicity","Helicity and 30 m wind"],
+    ["1000_500_thick","MSLP, 1000-500 mb thickness, hourly precipitation"],
+    ["1000_850_thick","MSLP, 1000-850 mb thickness, hourly precipitation"],
+    ["850_700_thick","MSLP, 850-700 mb thickness, hourly precipitation"]
+  ]],
+  ["Upper air", [
+    ["200_wnd_ht","200 mb wind and height"],
+    ["250_wnd_ht","250 mb wind and height"],
+    ["300_wnd_ht","300 mb wind and height"],
+    ["500_vort_ht","500 mb vorticity, wind, height"],
+    ["500_temp_ht","500 mb temperature, wind, height"],
+    ["700_rh_ht","700 mb relative humidity, wind, height, omega"],
+    ["850_temp_ht","850 mb temperature, wind, height"],
+    ["925_temp_ht","925 mb temperature, wind, height"]
+  ]]
+];
+
+var CAT_GFS = [
+  ["Precipitation", [
+    ["precip_p01","Total precipitation, 1 h"],
+    ["precip_p03","Total precipitation, 3 h"],
+    ["precip_p06","Total precipitation, 6 h"],
+    ["precip_p12","Total precipitation, 12 h"],
+    ["precip_p24","Total precipitation, 24 h"],
+    ["precip_ptot","Total accumulated precipitation"],
+    ["precip_rate_type","Precipitation rate and type"],
+    ["sim_radar_comp","Simulated composite radar reflectivity"],
+    ["snodpth_chng","Snow depth change from F00"]
+  ]],
+  ["Surface layer", [
+    ["1000_500_thick","MSLP, 1000-500 mb thickness, precipitation"],
+    ["1000_850_thick","MSLP, 1000-850 mb thickness, precipitation"],
+    ["850_700_thick","MSLP, 850-700 mb thickness, precipitation"],
+    ["850_temp_mslp_precip","MSLP, 850 mb temperature, precipitation"],
+    ["10m_wnd_precip","MSLP, 10 m wind, 2 m temperature, precipitation"],
+    ["10m_wnd_2m_temp","MSLP, 10 m wind, 2 m temperature"]
+  ]],
+  ["Upper air", [
+    ["200_wnd_ht","200 mb wind and height"],
+    ["250_wnd_ht","250 mb wind and height"],
+    ["300_wnd_ht","300 mb wind and height"],
+    ["500_rh_ht","500 mb relative humidity and height"],
+    ["500_wnd_ht","500 mb wind and height"],
+    ["500_vort_ht","500 mb vorticity, wind, height"],
+    ["700_rh_ht","700 mb relative humidity, height, omega"],
+    ["850_pw_ht","850 mb height, precipitable water, wind"],
+    ["850_rh_ht","850 mb relative humidity and height"],
+    ["850_temp_ht","850 mb temperature, wind, height"],
+    ["850_vort_ht","850 mb vorticity, wind, height"],
+    ["850vor_500ht_200wd","850 mb vorticity, 500 mb height, 200 mb wind"],
+    ["925_temp_ht","925 mb temperature, wind, height"]
+  ]]
+];
+
+/* id, label, areas, cycle interval (h), extended-cycle interval and its max,
+   normal max fh, default step, forecast-hour token, template, catalog, verified */
+var MODELS = [
+  { id:"hrrr", label:"HRRR - High Res Rapid Refresh", verified:true,
+    areas:["conus","alaska"], cyc:1, maxFH:18, extEvery:6, extMaxFH:48,
+    step:1, fhTok:"FHM", tpl:TPL_FLAT, cat:CAT_HRRR, sub:true },
+  { id:"rap", label:"RAP - Rapid Refresh", verified:true,
+    areas:["namer","conus","alaska"], cyc:1, maxFH:21, extEvery:6, extMaxFH:51,
+    step:1, fhTok:"FH3", tpl:TPL_FLAT, cat:CAT_RAP },
+  { id:"gfs", label:"GFS - Global Forecast System", verified:true,
+    areas:["namer","conus","alaska","atlantic","east-pac","europe","asia",
+           "arctic","polar","samer","north-pac","south-pac","india","africa","west-atl"],
+    cyc:6, maxFH:240, step:3, fhTok:"FH3", tpl:TPL_NESTED, cat:CAT_GFS },
+  { id:"nam", label:"NAM - North American Mesoscale", verified:false,
+    areas:["namer","conus","alaska","hawaii","puerto-rico"], cyc:6, maxFH:84,
+    step:3, fhTok:"FH3", tpl:TPL_FLAT, cat:CAT_RAP },
+  { id:"namhires", label:"NAM-HIRES - NAM nest", verified:false,
+    areas:["conus","alaska","hawaii","puerto-rico"], cyc:6, maxFH:60,
+    step:1, fhTok:"FH3", tpl:TPL_FLAT, cat:CAT_HRRR },
+  { id:"hiresw", label:"HIRESW - High Resolution Window", verified:false,
+    areas:["conus","alaska","hawaii","puerto-rico"], cyc:12, maxFH:48,
+    step:1, fhTok:"FH3", tpl:TPL_FLAT, cat:CAT_HRRR },
+  { id:"href", label:"HREF - High Res Ensemble Forecast", verified:false,
+    areas:["conus","alaska","hawaii","puerto-rico"], cyc:6, maxFH:48,
+    step:1, fhTok:"FH3", tpl:TPL_FLAT, cat:CAT_HRRR },
+  { id:"nbm", label:"NBM - National Blend of Models", verified:false,
+    areas:["conus","alaska","hawaii","puerto-rico"], cyc:1, maxFH:72,
+    step:1, fhTok:"FH3", tpl:TPL_FLAT, cat:CAT_RAP },
+  { id:"rtma", label:"RTMA - Real-Time Mesoscale Analysis", verified:false,
+    areas:["conus","alaska","hawaii","puerto-rico"], cyc:1, maxFH:0,
+    step:1, fhTok:"FH3", tpl:TPL_FLAT, cat:CAT_RAP },
+  { id:"sref", label:"SREF - Short Range Ensemble", verified:false,
+    areas:["namer","conus","alaska"], cyc:6, maxFH:87,
+    step:3, fhTok:"FH3", tpl:TPL_FLAT, cat:CAT_RAP },
+  { id:"gefs", label:"GEFS - Global Ensemble", verified:false,
+    areas:["namer","conus","atlantic","east-pac"], cyc:6, maxFH:384,
+    step:6, fhTok:"FH3", tpl:TPL_NESTED, cat:CAT_GFS },
+  { id:"firewx", label:"FIREWX - Fire Weather nest", verified:false,
+    areas:["conus"], cyc:6, maxFH:36, step:1, fhTok:"FH3", tpl:TPL_FLAT, cat:CAT_HRRR }
+];
+
+function modelById(id){
+  for(var i=0;i<MODELS.length;i++){ if(MODELS[i].id === id){ return MODELS[i]; } }
+  return MODELS[0];
+}
+function currentModel(){
+  return modelById(($("i-model") ? $("i-model").value.trim() : "hrrr") || "hrrr");
+}
+function currentCatalog(){ return currentModel().cat || CAT_HRRR; }
+
+function catalogHas(name){
+  var c = currentCatalog();
+  for(var i=0;i<c.length;i++){
+    for(var j=0;j<c[i][1].length;j++){ if(c[i][1][j][0] === name){ return true; } }
+  }
+  return false;
+}
+
+/* Forecast-hour limit for a cycle, honouring extended runs. */
+function maxFH(cycle){
+  var m = currentModel();
+  if(!cycle){ return m.maxFH; }
+  if(m.extEvery && (cycle.getUTCHours() % m.extEvery === 0)){ return m.extMaxFH; }
+  return m.maxFH;
+}
+
+/* Situations are filtered to whatever the selected model actually publishes. */
+var SITUATIONS = [
+  ["Convective", ["sim_radar_comp","echo_top","sfc_cape_cin","lightning"]],
+  ["Convective (RAP/NAM)", ["sim_radar_comp","cape_cin","helicity","precip_rate"]],
+  ["Terminal",   ["ceiling","vis","10m_wnd_sfc_gust","precip_rate_type"]],
+  ["Terminal (RAP/NAM)", ["vis","10m_wnd_sfc_gust","2m_dewp_10m_wnd","precip_p01"]],
+  ["Winter",     ["precip_rate_type","snow_total","2m_temp_10m_wnd","1000_500_thick"]],
+  ["Enroute",    ["250_wnd","300_wnd","500_vort_ht","700_rh_ht"]],
+  ["Enroute (RAP/GFS)", ["250_wnd_ht","300_wnd_ht","500_vort_ht","700_rh_ht"]],
+  ["Wind",       ["10m_wnd","10m_maxwnd","10m_wnd_sfc_gust","2m_temp_10m_wnd"]],
+  ["Synoptic",   ["1000_500_thick","500_vort_ht","850_temp_ht","precip_ptot"]]
+];
+
+/* Templates corrected by READ BACK are remembered per model. */
+function learnedTpl(id){
+  try {
+    var m = JSON.parse(store.get("hrrrloop.learned") || "{}");
+    return m[id] || null;
+  } catch(e){ return null; }
+}
+function learnTpl(id,tpl){
+  try {
+    var m = JSON.parse(store.get("hrrrloop.learned") || "{}");
+    m[id] = tpl;
+    store.set("hrrrloop.learned", JSON.stringify(m));
+  } catch(e){ /* ignore */ }
+}
+
+/* ============================================================
+   model selection
+   ============================================================ */
+function fillModelSelect(){
+  var sel = $("i-modelsel");
+  sel.innerHTML = "";
+  for(var i=0;i<MODELS.length;i++){
+    var o = el("option");
+    o.value = MODELS[i].id;
+    o.textContent = MODELS[i].label + (MODELS[i].verified ? "" : "  (unconfirmed)");
+    sel.appendChild(o);
+  }
+  sel.value = currentModel().id;
+}
+
+function fillAreaSelect(){
+  var m = currentModel();
+  var sel = $("i-areasel");
+  var want = $("i-area").value.trim();
+  sel.innerHTML = "";
+  var found = false;
+  for(var i=0;i<m.areas.length;i++){
+    var o = el("option");
+    o.value = m.areas[i];
+    o.textContent = m.areas[i];
+    if(m.areas[i] === want){ o.selected = true; found = true; }
+    sel.appendChild(o);
+  }
+  if(!found && want){
+    var x = el("option");
+    x.value = want; x.textContent = want + " (custom)"; x.selected = true;
+    sel.appendChild(x);
+  }
+}
+
+function showVerified(){
+  var m = currentModel();
+  var n = $("s-verified");
+  if(!n){ return; }
+  n.className = "vflag " + (m.verified ? "yes" : "no");
+  n.textContent = m.verified
+    ? "path confirmed against MAG"
+    : "path not confirmed - use READ BACK if frames fail";
+}
+
+/* Switching model resets everything that is model-specific. */
+function applyModel(id, keepParams){
+  var m = modelById(id);
+  $("i-model").value = m.id;
+  if(!keepParams || m.areas.indexOf($("i-area").value.trim()) === -1){
+    $("i-area").value = m.areas[0];
+  }
+  $("i-tpl").value = learnedTpl(m.id) || m.tpl;
+
+  fillAreaSelect();
+  showVerified();
+  buildProductGrid();
+  buildSituations();
+
+  if(!keepParams){
+    var first = m.cat[0][1][0][0];
+    for(var p=0;p<4;p++){
+      var grp = m.cat[Math.min(p, m.cat.length-1)][1];
+      var pick = grp[Math.min(p, grp.length-1)][0] || first;
+      var f = $("i-p"+p);
+      if(f){ f.value = pick; }
+    }
+  }
+  for(var k=0;k<4;k++){ syncSelectFromText(k); }
+
+  $("i-f0").value = "0";
+  $("i-f1").value = String(m.maxFH);
+  $("i-fs").value = String(m.step);
+  $("b-sub").disabled = !m.sub;
+
+  S.cycle = null;
+  persist();
+  writeHash();
+  showTemplate();
+  detectLatest();
 }
 
 /* ============================================================
@@ -885,7 +1145,7 @@ function wantKeyFor(p){
   if(!S.fhList.length){ return ""; }
   var fh = S.fhList[S.idx];
   var which = currentWhich();
-  return frameKey(p, which === "prev" ? fh+1 : fh, which);
+  return frameKey(p, which === "prev" ? fh+(currentModel().cyc||1) : fh, which);
 }
 
 function loadCompareSet(){
@@ -893,7 +1153,7 @@ function loadCompareSet(){
   for(var p=0;p<S.panels;p++){
     for(var i=0;i<S.fhList.length;i++){
       /* one cycle earlier at the same valid time means one forecast hour further out */
-      queueFrame(p, S.fhList[i]+1, "prev", S.prevCycle);
+      queueFrame(p, S.fhList[i]+(currentModel().cyc||1), "prev", S.prevCycle);
     }
   }
 }
@@ -975,7 +1235,7 @@ function show(i){
     var pane = document.querySelector('.pane[data-p="'+p+'"]');
     if(!pane){ continue; }
     var imgs = pane.querySelectorAll(".pane-imgs img");
-    var want = frameKey(p, which === "prev" ? fh+1 : fh, which);
+    var want = frameKey(p, which === "prev" ? fh+(currentModel().cyc||1) : fh, which);
     var found = false;
     for(var k=0;k<imgs.length;k++){
       var key = imgs[k].getAttribute("data-key");
@@ -1019,7 +1279,7 @@ function updateSlugs(){
   if(!S.cycle){ return; }
   var fh = S.fhList.length ? S.fhList[S.idx] : 0;
   var eff = S.compare ? S.prevCycle : S.cycle;
-  var effFh = S.compare ? fh + 1 : fh;
+  var effFh = S.compare ? fh + (currentModel().cyc||1) : fh;
   setStatus("s-run", cycleLabel(eff));
   setStatus("s-fh", fhLabel(effFh));
   var v = validDate(eff, effFh);
@@ -1095,10 +1355,11 @@ function buildProductGrid(){
       var sel = el("select","sel");
       sel.id = "i-ps"+p;
       sel.setAttribute("aria-label","Product for panel "+(p+1));
-      for(var i=0;i<CATALOG.length;i++){
+      var CAT = currentCatalog();
+      for(var i=0;i<CAT.length;i++){
         var og = el("optgroup");
-        og.label = CATALOG[i][0];
-        var items = CATALOG[i][1];
+        og.label = CAT[i][0];
+        var items = CAT[i][1];
         for(var j=0;j<items.length;j++){
           var o = el("option");
           o.value = items[j][0];
@@ -1155,7 +1416,13 @@ function syncCustomFields(){
 function buildSituations(){
   var wrap = $("sit");
   wrap.innerHTML = "";
+  var shown = 0;
   SITUATIONS.forEach(function(pair){
+    /* only offer sets this model actually publishes */
+    var ok = true;
+    for(var i=0;i<4;i++){ if(!catalogHas(pair[1][i])){ ok = false; } }
+    if(!ok){ return; }
+    shown++;
     var b = el("button","chip sit");
     b.textContent = pair[0];
     b.title = pair[1].join(", ");
@@ -1169,6 +1436,11 @@ function buildSituations(){
     });
     wrap.appendChild(b);
   });
+  if(!shown){
+    var n = el("span","hint");
+    n.textContent = "No preset panel sets match this model's product list.";
+    wrap.appendChild(n);
+  }
 }
 
 /* ============================================================
@@ -1187,7 +1459,7 @@ function setWatch(on){
 
 function checkForNewRun(){
   if(!S.cycle){ return; }
-  var next = new Date(S.cycle.getTime() + 3600000);
+  var next = new Date(S.cycle.getTime() + (currentModel().cyc||1)*3600000);
   if(next.getTime() > Date.now()){ return; }
   probeImage(buildUrl(PROBE_FH, PROBE_PARAM, next), function(good){
     if(!good){ return; }
@@ -1546,6 +1818,8 @@ function readBack(){
   }
 
   $("i-tpl").value = u.origin + out + (u.search || "");
+  learnTpl(currentModel().id, $("i-tpl").value);
+  notes.push("saved as the template for " + currentModel().id);
   persist();
   setProbe("ok","Template rebuilt.<br>" + $("i-tpl").value +
     "<br><br>Recognised: " + notes.join(" / ") +
@@ -1683,12 +1957,19 @@ function setPanels(n,quiet){
 }
 
 function init(){
+  fillModelSelect();
   buildProductGrid();
   buildSituations();
   fillPresets();
   restore();
   readHash();
+  fillModelSelect();
+  fillAreaSelect();
+  showVerified();
+  buildProductGrid();
+  buildSituations();
   for(var s0=0;s0<4;s0++){ syncSelectFromText(s0); }
+  $("b-sub").disabled = !currentModel().sub;
   writeHash();
 
   $("b-play").addEventListener("click", toggle);
@@ -1709,6 +1990,15 @@ function init(){
   $("b-watch").addEventListener("click", function(){ setWatch(!S.watch); });
   $("b-wall").addEventListener("click", function(){ setWall(!S.wall); });
   $("b-link").addEventListener("click", copyLink);
+  $("i-modelsel").addEventListener("change", function(){ applyModel(this.value, false); });
+  $("i-areasel").addEventListener("change", function(){
+    $("i-area").value = this.value;
+    persist(); writeHash(); detectLatest();
+  });
+  $("i-model").addEventListener("change", function(){ applyModel(this.value.trim(), true); });
+  $("i-area").addEventListener("change", function(){
+    fillAreaSelect(); persist(); writeHash(); detectLatest();
+  });
   $("b-find").addEventListener("click", runPatternFinder);
   $("b-browse").addEventListener("click", browseDirectory);
   $("b-reset").addEventListener("click", resetToDefaults);
