@@ -526,7 +526,7 @@ var store = (function(){
    because HRRR publishes sub-hourly frames. https, not http - a page served
    over https cannot load http images. */
 var DEFAULT_TPL =
-  "https://mag.ncep.noaa.gov/data/{MODEL}/{HH}/{MODEL}_{AREA}_{FHM}_{PARAM}{SIZE}.gif";
+  "https://mag.ncep.noaa.gov/data/{MODEL}/{HH}/{MODEL}_{AREA}_{FHTOK}_{PARAM}{SIZE}.gif";
 /* GFS uses plain hhh and nests area/parameter directories. */
 var GFS_TPL =
   "https://mag.ncep.noaa.gov/data/{MODEL}/{HH}/{AREA}/{PARAM}/{MODEL}_{AREA}_{FH3}_{PARAM}{SIZE}.gif";
@@ -540,7 +540,7 @@ var DEFAULT_LATENCY_MIN = 120;
 /* Bumped whenever the shipped template changes. Saved settings and shared links
    carry this stamp; anything older has its template discarded rather than
    allowed to override a fix. Everything else the user chose is kept. */
-var CFG_VERSION = 5;
+var CFG_VERSION = 6;
 
 var BUILTIN_PRESETS = [
   { name:"NCEP MAG - HRRR CONUS", tpl:DEFAULT_TPL, model:"hrrr", area:"conus",
@@ -1106,6 +1106,7 @@ function loadAll(){
 function queueFrame(p,fh,which,cycle){
   var key = frameKey(p,fh,which);
   if(S.frames[key]){ return; }
+  if(!paramFor(p)){ return; }   /* no product chosen for this panel */
   var url = buildUrl(fh, paramFor(p), cycle);
   var gen = S.gen;
   var rec = { status:"loading", url:url };
@@ -1247,7 +1248,10 @@ function show(i){
     var em = $("empty-"+p);
     if(em){
       em.style.display = found ? "none" : "flex";
-      if(!found){
+      if(!found && !paramFor(p)){
+        em.innerHTML = "<b>NO PRODUCT</b><span>Choose a product for panel " + (p+1) +
+                       " in the drawer below.</span>";
+      } else if(!found){
         var rec = S.frames[want];
         var u = em.querySelector(".u");
         if(!u){ u = el("div","u"); em.appendChild(u); }
@@ -1342,6 +1346,12 @@ function toggleFlicker(){
    ============================================================ */
 function buildProductGrid(){
   var g = $("pgrid");
+  /* rebuilding replaces the inputs, so carry their values across */
+  var keep = [];
+  for(var q=0;q<4;q++){
+    var old = $("i-p"+q);
+    keep.push(old ? old.value : "");
+  }
   g.innerHTML = "";
   for(var p=0;p<4;p++){
     (function(p){
@@ -1390,9 +1400,11 @@ function buildProductGrid(){
         persist(); writeHash(); loadAll();
       });
 
+      if(keep[p]){ txt.value = keep[p]; }
       g.appendChild(row);
     })(p);
   }
+  for(var r=0;r<4;r++){ syncSelectFromText(r); }
 }
 
 function syncSelectFromText(p){
@@ -1957,9 +1969,6 @@ function setPanels(n,quiet){
 }
 
 function init(){
-  fillModelSelect();
-  buildProductGrid();
-  buildSituations();
   fillPresets();
   restore();
   readHash();
@@ -1969,6 +1978,8 @@ function init(){
   buildProductGrid();
   buildSituations();
   for(var s0=0;s0<4;s0++){ syncSelectFromText(s0); }
+  /* nothing usable came back from saved settings - take the model defaults */
+  if(!paramFor(0)){ applyModel(currentModel().id, false); return; }
   $("b-sub").disabled = !currentModel().sub;
   writeHash();
 
