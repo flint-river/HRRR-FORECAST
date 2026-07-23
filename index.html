@@ -519,6 +519,11 @@ var GFS_TPL =
    is chosen from the clock. HRRR publishes roughly 50-90 min behind cycle time. */
 var DEFAULT_LATENCY_MIN = 120;
 
+/* Bumped whenever the shipped template changes. Saved settings and shared links
+   carry this stamp; anything older has its template discarded rather than
+   allowed to override a fix. Everything else the user chose is kept. */
+var CFG_VERSION = 4;
+
 var BUILTIN_PRESETS = [
   { name:"NCEP MAG - HRRR CONUS", tpl:DEFAULT_TPL, model:"hrrr", area:"conus",
     params:["precip_p01","500_vort_ht","850_temp_mslp_precip","2m_temp_10m_wnd"] },
@@ -604,7 +609,7 @@ var S = {
   timer:null, flickTimer:null,
   frames:{}, loadedCount:0, missingCount:0,
   gen:0,
-  watch:false, watchTimer:null, wall:false
+  watch:false, watchTimer:null, wall:false, migrated:false
 };
 
 function $(id){ return document.getElementById(id); }
@@ -1220,6 +1225,7 @@ function showTemplate(){
 function writeHash(){
   showTemplate();
   var q = [
+    "v=" + CFG_VERSION,
     "m=" + encodeURIComponent($("i-model").value.trim()),
     "a=" + encodeURIComponent($("i-area").value.trim()),
     "p=" + encodeURIComponent([paramFor(0),paramFor(1),paramFor(2),paramFor(3)].join(",")),
@@ -1241,7 +1247,9 @@ function readHash(){
     var i = kv.indexOf("=");
     if(i > 0){ q[kv.slice(0,i)] = decodeURIComponent(kv.slice(i+1)); }
   });
-  if(q.t){ $("i-tpl").value = q.t; }
+  /* A link made by an older build carries an outdated template - ignore it. */
+  if(q.t && String(q.v) === String(CFG_VERSION)){ $("i-tpl").value = q.t; }
+  else if(q.t){ S.migrated = true; }
   if(q.z !== undefined){ $("i-size").value = q.z; }
   if(q.g){ $("i-lat").value = q.g; }
   if(q.m){ $("i-model").value = q.m; }
@@ -1618,6 +1626,7 @@ function deletePreset(){
 
 function persist(){
   store.set("hrrrloop.cfg", JSON.stringify({
+    v:CFG_VERSION,
     tpl:$("i-tpl").value, model:$("i-model").value, area:$("i-area").value,
     p:[paramFor(0),paramFor(1),paramFor(2),paramFor(3)],
     f0:$("i-f0").value, f1:$("i-f1").value, fs:$("i-fs").value,
@@ -1630,6 +1639,11 @@ function restore(){
   try { c = JSON.parse(store.get("hrrrloop.cfg") || "null"); } catch(e){ c = null; }
   if(c && !c.tpl){ c = null; }
   if(!c){ $("i-tpl").value = DEFAULT_TPL; return; }
+  /* Saved template from an older build is stale by definition - drop it. */
+  if(c.v !== CFG_VERSION){
+    c.tpl = "";
+    S.migrated = true;
+  }
   $("i-tpl").value = c.tpl || DEFAULT_TPL;
   if(c.model){ $("i-model").value = c.model; }
   if(c.area){ $("i-area").value = c.area; }
@@ -1752,6 +1766,12 @@ function init(){
     else if(k === "4"){ setPanels(4); }
   });
 
+  showTemplate();
+  if(S.migrated){
+    setProbe("ok","Settings were carried over from an earlier build, but its image " +
+      "template was out of date and has been replaced with the current one. " +
+      "Products, range, and panel count were kept.");
+  }
   buildStage();
   detectLatest();
 }
