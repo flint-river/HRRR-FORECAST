@@ -565,7 +565,7 @@ var S = {
   timer:null, flickTimer:null,
   frames:{}, loadedCount:0, missingCount:0,
   gen:0,
-  watch:false, watchTimer:null, wall:false, migrated:false
+  watch:false, watchTimer:null, wall:false, migrated:false, booted:false
 };
 
 function $(id){ return document.getElementById(id); }
@@ -1968,7 +1968,7 @@ function setPanels(n,quiet){
   if(!quiet){ persist(); writeHash(); loadAll(); }
 }
 
-function init(){
+function initInner(){
   fillPresets();
   restore();
   readHash();
@@ -1978,8 +1978,9 @@ function init(){
   buildProductGrid();
   buildSituations();
   for(var s0=0;s0<4;s0++){ syncSelectFromText(s0); }
-  /* nothing usable came back from saved settings - take the model defaults */
-  if(!paramFor(0)){ applyModel(currentModel().id, false); return; }
+  /* nothing usable came back from saved settings - note it, but finish wiring
+     the UI first. Returning here would leave every button dead. */
+  var needDefaults = !paramFor(0);
   $("b-sub").disabled = !currentModel().sub;
   writeHash();
 
@@ -2074,8 +2075,30 @@ function init(){
       "Products, range, and panel count were kept.");
   }
   buildStage();
-  detectLatest();
+  S.booted = true;
+  if(needDefaults){ applyModel(currentModel().id, false); }
+  else { detectLatest(); }
 }
+
+/* A throw partway through setup used to leave controls unwired and silent.
+   Surface it instead, and still attach the transport buttons. */
+function init(){
+  try {
+    initInner();
+  } catch(err){
+    try {
+      setProbe("bad","Startup error: " + (err && err.message ? err.message : err) +
+        "<br>Press RESET TO DEFAULTS. If it repeats, this message is the thing to report.");
+      $("drawer").open = true;
+    } catch(e2){ /* nothing left to do */ }
+    if(window.console && console.error){ console.error(err); }
+  }
+}
+
+window.addEventListener("error", function(e){
+  if(!S.booted){ return; }
+  try { setProbe("bad","Script error: " + e.message); } catch(e2){ /* ignore */ }
+});
 
 if(document.readyState === "loading"){
   document.addEventListener("DOMContentLoaded", init);
