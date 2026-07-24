@@ -261,6 +261,7 @@ button,select,input[type=text]{font-family:var(--mono);font-size:12px}
     <div class="slug brand">
       <span class="slug-k">Source</span>
       <span class="slug-v" id="s-src">NCEP MAG</span>
+      <span class="slug-sub" id="s-build">build &mdash;</span>
     </div>
     <div class="slug">
       <span class="slug-k">Run cycle</span>
@@ -541,6 +542,10 @@ var DEFAULT_LATENCY_MIN = 120;
    carry this stamp; anything older has its template discarded rather than
    allowed to override a fix. Everything else the user chose is kept. */
 var CFG_VERSION = 6;
+
+/* Shown in the header. If this is not the number quoted in chat, the browser or
+   the Pages CDN is serving a cached copy - hard reload, or add ?v=N to the URL. */
+var BUILD = "7";
 
 var BUILTIN_PRESETS = [
   { name:"NCEP MAG - HRRR CONUS", tpl:DEFAULT_TPL, model:"hrrr", area:"conus",
@@ -2069,6 +2074,7 @@ function initInner(){
   });
 
   showTemplate();
+  setStatus("s-build","build " + BUILD);
   if(S.migrated){
     setProbe("ok","Settings were carried over from an earlier build, but its image " +
       "template was out of date and has been replaced with the current one. " +
