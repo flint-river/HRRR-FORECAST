@@ -208,6 +208,34 @@ button,select,input[type=text]{font-family:var(--mono);font-size:12px}
 }
 .chip:hover{color:var(--text);border-color:var(--dim)}
 
+/* ---------- simple layout ---------- */
+.top{
+  display:flex;align-items:center;gap:12px;flex:0 0 auto;
+  padding:0 12px;background:var(--panel2);border-bottom:1px solid var(--rule);
+}
+.tabs{display:flex;gap:0;overflow-x:auto;flex:1 1 auto}
+.topright{display:flex;align-items:center;gap:8px;flex:0 0 auto;padding:7px 0}
+.chip.sit{
+  background:none;border:0;border-bottom:2px solid transparent;border-radius:0;
+  padding:13px 16px;font-size:12px;letter-spacing:.08em;text-transform:uppercase;
+  color:var(--dim);white-space:nowrap;
+}
+.chip.sit:hover{color:var(--text)}
+.chip.sit.on{color:var(--amber);border-bottom-color:var(--amber)}
+.slug.big .slug-v{font-size:21px}
+.seg{display:flex;gap:0}
+.seg .btn{border-radius:0;border-right-width:0}
+.seg .btn:first-child{border-radius:2px 0 0 2px}
+.seg .btn:last-child{border-radius:0 2px 2px 0;border-right-width:1px}
+.btn.play{min-width:74px}
+.statrow{
+  display:flex;flex-wrap:wrap;gap:18px;font-family:var(--mono);
+  font-size:11px;color:var(--dim);
+}
+.statrow b{color:var(--text);font-weight:400}
+.tplline{word-break:break-all;color:var(--amber)}
+.deck{align-items:center}
+
 /* ---------- added in v2 ---------- */
 .btn.ghost{
   align-self:center;margin:0 12px;background:none;
@@ -239,7 +267,8 @@ button,select,input[type=text]{font-family:var(--mono);font-size:12px}
 .app.wall .bar .flag{padding:10px 20px}
 .app.wall .bar .slug-v{font-size:22px}
 .app.wall .bar .slug-k{font-size:11px}
-.app.wall #deck,
+.app.wall .deck,
+.app.wall .top,
 .app.wall .src{display:none}
 .app.wall .stage{padding:6px}
 .app.wall .bay-scroll .cell{min-width:44px}
@@ -257,230 +286,180 @@ button,select,input[type=text]{font-family:var(--mono);font-size:12px}
 <body>
 <div class="app" id="app">
 
-  <header class="bar">
-    <div class="slug brand">
-      <span class="slug-k">Source</span>
-      <span class="slug-v" id="s-src">NCEP MAG</span>
-      <span class="slug-sub" id="s-build">build &mdash;</span>
+  <header class="top">
+    <div class="tabs" id="sit"></div>
+    <div class="topright">
+      <select class="sel" id="i-modelsel" aria-label="Model"></select>
+      <button class="btn ghost" id="b-wall" title="Wall display mode (W)">WALL</button>
     </div>
-    <div class="slug">
-      <span class="slug-k">Run cycle</span>
-      <span class="slug-v amber" id="s-run">&mdash;</span>
-      <span class="slug-sub" id="s-runsub">detecting</span>
+  </header>
+
+  <div class="bar">
+    <div class="slug big">
+      <span class="slug-k">Valid</span>
+      <span class="slug-v cyan" id="s-valid">&mdash;</span>
+      <span class="slug-sub" id="s-validet">&mdash;</span>
     </div>
     <div class="slug">
       <span class="slug-k">Forecast hour</span>
       <span class="slug-v" id="s-fh">&mdash;</span>
     </div>
     <div class="slug">
-      <span class="slug-k">Valid</span>
-      <span class="slug-v cyan" id="s-valid">&mdash;</span>
-      <span class="slug-sub" id="s-validet">&mdash;</span>
-    </div>
-    <div class="slug">
-      <span class="slug-k">Image age</span>
-      <span class="slug-v" id="s-age">&mdash;</span>
-      <span class="slug-sub" id="s-agesub">&nbsp;</span>
-    </div>
-    <div class="slug">
-      <span class="slug-k">Frames</span>
-      <span class="slug-v" id="s-frames">0 / 0</span>
-      <span class="slug-sub" id="s-missing">&nbsp;</span>
-    </div>
-    <div class="slug" style="min-width:0">
-      <span class="slug-k">Template in use</span>
-      <span class="slug-sub" id="s-tpl" style="font-size:10px">&mdash;</span>
+      <span class="slug-k">Run cycle</span>
+      <span class="slug-v amber" id="s-run">&mdash;</span>
+      <span class="slug-sub" id="s-runsub">detecting</span>
     </div>
     <div class="spacer"></div>
     <span class="flag stale" id="s-stale" hidden>STALE &mdash; CHECK CYCLE</span>
-    <span class="flag watch" id="s-watch" hidden>WATCHING FOR NEW RUN</span>
+    <span class="flag watch" id="s-watch" hidden>WATCHING</span>
     <span class="flag" id="s-flag" hidden>PREVIOUS RUN</span>
-    <button class="btn ghost" id="b-wall" title="Wall display mode (W)">WALL</button>
-  </header>
+  </div>
 
   <main class="stage p1" id="stage"></main>
 
   <div class="bay" id="bay-wrap"><div class="bay-scroll" id="bay"></div></div>
 
-  <div class="deck" id="deck">
-    <div class="grp">
-      <span class="grp-k">Model / area</span>
-      <div class="row">
-        <select class="sel" id="i-modelsel" aria-label="Model" style="min-width:230px"></select>
-        <select class="sel" id="i-areasel" aria-label="Area"></select>
-      </div>
+  <div class="deck">
+    <button class="btn wide play" id="b-play" title="Play / pause (space)">PLAY</button>
+
+    <div class="seg" id="spans">
+      <button class="btn" id="b-span6">6 H</button>
+      <button class="btn" id="b-span12">12 H</button>
+      <button class="btn" id="b-spanfull">FULL RUN</button>
+      <button class="btn" id="b-sub" title="15-minute frames">15 MIN</button>
     </div>
 
-    <div class="grp">
-      <span class="grp-k">Transport</span>
-      <div class="row">
-        <button class="btn" id="b-first" title="First frame (Home)">|&lt;</button>
-        <button class="btn" id="b-prev" title="Step back (J or left arrow)">&lt;</button>
-        <button class="btn wide" id="b-play" title="Play / pause (space)">PLAY</button>
-        <button class="btn" id="b-next" title="Step forward (K or right arrow)">&gt;</button>
-        <button class="btn" id="b-last" title="Last frame (End)">&gt;|</button>
-      </div>
+    <button class="btn cmp" id="b-cmp" title="Previous run, same valid time (C)">PREV RUN</button>
+
+    <div class="seg" id="rates">
+      <button class="btn" data-rate="3">SLOW</button>
+      <button class="btn" data-rate="6">MED</button>
+      <button class="btn" data-rate="12">FAST</button>
     </div>
 
-    <div class="grp">
-      <span class="grp-k">Rate <span id="l-rate">6 fps</span></span>
-      <div class="row">
-        <input class="rng" type="range" id="i-rate" min="1" max="16" value="6" aria-label="Frames per second">
-        <span class="grp-k">Hold last</span>
-        <input class="num" type="text" id="i-dwell" value="1.2" aria-label="Hold last frame in seconds">
-      </div>
-    </div>
-
-    <div class="grp">
-      <span class="grp-k">Range &mdash; start / end / step</span>
-      <div class="row">
-        <input class="num" type="text" id="i-f0" value="0" aria-label="Start forecast hour">
-        <input class="num" type="text" id="i-f1" value="18" aria-label="End forecast hour">
-        <input class="num" type="text" id="i-fs" value="1" aria-label="Forecast hour step">
-        <button class="btn" id="b-load">LOAD</button>
-        <button class="btn" id="b-sub" title="15-minute frames, F00 to F06">15 MIN</button>
-      </div>
-    </div>
-
-    <div class="grp">
-      <span class="grp-k">Run cycle</span>
-      <div class="row">
-        <select class="sel" id="i-cycle" aria-label="Run cycle"></select>
-        <button class="btn" id="b-latest" title="Re-detect latest run (R)">LATEST</button>
-        <button class="btn" id="b-watch" title="Roll forward automatically when a new run lands">WATCH</button>
-      </div>
-    </div>
-
-    <div class="grp">
-      <span class="grp-k">Publish lag (min)</span>
-      <div class="row">
-        <input class="num" type="text" id="i-lat" value="120"
-               title="How far behind cycle time MAG is assumed to be">
-        <select class="sel" id="i-size" aria-label="Image size">
-          <option value="">Medium</option>
-          <option value="_l">Large</option>
-          <option value="_s">Small</option>
-        </select>
-      </div>
-    </div>
-
-    <div class="grp">
-      <span class="grp-k">Panels</span>
-      <div class="row">
-        <button class="btn on" data-pan="1">1</button>
-        <button class="btn" data-pan="2">2</button>
-        <button class="btn" data-pan="4">4</button>
-      </div>
-    </div>
-
-    <div class="grp">
-      <span class="grp-k">Compare</span>
-      <div class="row">
-        <button class="btn cmp" id="b-cmp" title="Previous run at the same valid time (C)">PREV RUN</button>
-        <button class="btn" id="b-flick" title="Alternate current and previous run (F)">FLICKER</button>
-      </div>
-    </div>
-
-    <div class="grp">
-      <span class="grp-k">Share</span>
-      <div class="row">
-        <button class="btn" id="b-link" title="Copy a link that reopens this exact loop">COPY LINK</button>
-      </div>
-    </div>
+    <div class="spacer"></div>
+    <button class="btn ghost" id="b-gear" title="Settings and diagnostics">SETTINGS</button>
   </div>
 
   <details class="src" id="drawer">
-    <summary>Products, source template, and verification</summary>
+    <summary>Settings, products, and diagnostics</summary>
     <div class="src-body">
 
       <div class="grp">
-        <span class="grp-k">Situation &mdash; sets all four panels at once</span>
-        <div class="plist" id="sit"></div>
+        <span class="grp-k">Status</span>
+        <div class="statrow">
+          <span><b id="s-src">NCEP MAG</b> <span id="s-build">build &mdash;</span></span>
+          <span>Image age <b id="s-age">&mdash;</b> <span id="s-agesub">&nbsp;</span></span>
+          <span>Frames <b id="s-frames">0 / 0</b> <span id="s-missing">&nbsp;</span></span>
+        </div>
+        <div class="statrow"><span id="s-tpl" class="tplline">&mdash;</span></div>
       </div>
 
       <div class="grp">
-        <span class="grp-k">Products by panel</span>
-        <div class="pgrid" id="pgrid"></div>
-        <p class="hint">
-          The catalog is the NCEP MAG HRRR CONUS product list. Choose <b>Custom</b> to type a
-          parameter name MAG has added since, or to point the app at a different image service.
-        </p>
-      </div>
-
-      <div class="grp">
-        <span class="grp-k">URL template</span>
-        <input class="tpl" type="text" id="i-tpl" spellcheck="false">
-        <p class="hint">
-          Tokens substituted per frame:
-          <code>{CYCLE}</code> run as YYYYMMDDHH &middot;
-          <code>{YYYY}</code> <code>{MM}</code> <code>{DD}</code> <code>{HH}</code> run parts &middot;
-          <code>{FH}</code> <code>{FH2}</code> <code>{FH3}</code> forecast hour unpadded / 2-digit / 3-digit &middot;
-          <code>{MODEL}</code> <code>{AREA}</code> <code>{PARAM}</code> from the fields below.
-        </p>
-      </div>
-
-      <div class="row" style="flex-wrap:wrap;gap:14px;align-items:flex-end">
-        <div class="grp">
-          <span class="grp-k">Model id (path segment)</span>
-          <input class="num" style="width:130px" type="text" id="i-model" value="hrrr">
-        </div>
-        <div class="grp">
-          <span class="grp-k">Area id</span>
-          <input class="num" style="width:130px" type="text" id="i-area" value="conus">
-        </div>
-        <div class="grp">
-          <span class="grp-k">&nbsp;</span>
+        <span class="grp-k">Area and panels</span>
+        <div class="row">
+          <select class="sel" id="i-areasel" aria-label="Area"></select>
+          <span class="grp-k">Panels</span>
+          <button class="btn on" data-pan="1">1</button>
+          <button class="btn" data-pan="2">2</button>
+          <button class="btn" data-pan="4">4</button>
           <span class="vflag" id="s-verified">&nbsp;</span>
         </div>
       </div>
 
       <div class="grp">
-        <span class="grp-k">Verify against a known-good image URL</span>
-        <input class="tpl" type="text" id="i-probe" spellcheck="false"
-               placeholder="Paste one working image URL copied from MAG, then press READ BACK">
-        <div class="row">
-          <button class="btn" id="b-read">READ BACK</button>
-          <button class="btn" id="b-test">TEST CURRENT TEMPLATE</button>
-          <button class="btn" id="b-copy">COPY CURRENT FRAME URL</button>
-          <button class="btn" id="b-browse">BROWSE DIRECTORY</button>
-          <button class="btn danger" id="b-reset">RESET TO DEFAULTS</button>
-        </div>
-        <div class="probe" id="probe">Nothing tested yet.</div>
+        <span class="grp-k">Products by panel</span>
+        <div class="pgrid" id="pgrid"></div>
       </div>
 
       <div class="grp">
-        <span class="grp-k">Cannot find the images? Test every path shape</span>
-        <div class="row">
-          <button class="btn" id="b-find">FIND WORKING PATTERN</button>
+        <span class="grp-k">Run cycle and timing</span>
+        <div class="row" style="flex-wrap:wrap">
+          <select class="sel" id="i-cycle" aria-label="Run cycle"></select>
+          <button class="btn" id="b-latest" title="Re-detect latest run (R)">LATEST</button>
+          <button class="btn" id="b-watch" title="Roll forward when a new run lands">WATCH</button>
+          <button class="btn" id="b-flick" title="Alternate current and previous run (F)">FLICKER</button>
+          <button class="btn" id="b-link" title="Copy a link that reopens this loop">COPY LINK</button>
         </div>
+        <div class="row" style="flex-wrap:wrap">
+          <span class="grp-k">Rate <span id="l-rate">6 fps</span></span>
+          <input class="rng" type="range" id="i-rate" min="1" max="16" value="6" aria-label="Frames per second">
+          <span class="grp-k">Hold last</span>
+          <input class="num" type="text" id="i-dwell" value="1.2" aria-label="Hold last frame seconds">
+          <span class="grp-k">Publish lag</span>
+          <input class="num" type="text" id="i-lat" value="120" title="Assumed minutes behind cycle time">
+          <select class="sel" id="i-size" aria-label="Image size">
+            <option value="">Medium</option>
+            <option value="_l">Large</option>
+            <option value="_s">Small</option>
+          </select>
+        </div>
+        <div class="row">
+          <span class="grp-k">Custom span</span>
+          <input class="num" type="text" id="i-f0" value="0" aria-label="Start forecast hour">
+          <input class="num" type="text" id="i-f1" value="18" aria-label="End forecast hour">
+          <input class="num" type="text" id="i-fs" value="1" aria-label="Step">
+          <button class="btn" id="b-load">LOAD</button>
+          <button class="btn" id="b-first">|&lt;</button>
+          <button class="btn" id="b-prev">&lt;</button>
+          <button class="btn" id="b-next">&gt;</button>
+          <button class="btn" id="b-last">&gt;|</button>
+        </div>
+      </div>
+
+      <div class="grp">
+        <span class="grp-k">Image source</span>
+        <input class="tpl" type="text" id="i-tpl" spellcheck="false">
+        <div class="row" style="flex-wrap:wrap;align-items:flex-end">
+          <div class="grp">
+            <span class="grp-k">Model id</span>
+            <input class="num" style="width:120px" type="text" id="i-model" value="hrrr">
+          </div>
+          <div class="grp">
+            <span class="grp-k">Area id</span>
+            <input class="num" style="width:120px" type="text" id="i-area" value="conus">
+          </div>
+        </div>
+        <p class="hint">
+          Tokens: <code>{HH}</code> run hour &middot; <code>{CYCLE}</code> YYYYMMDDHH &middot;
+          <code>{FHTOK}</code> forecast field in this model's format &middot;
+          <code>{FH3}</code> <code>{FHM}</code> force hhh or hhhmm &middot;
+          <code>{MODEL}</code> <code>{AREA}</code> <code>{PARAM}</code> <code>{SIZE}</code>.
+        </p>
+      </div>
+
+      <div class="grp">
+        <span class="grp-k">If frames stop loading</span>
+        <input class="tpl" type="text" id="i-probe" spellcheck="false"
+               placeholder="Paste the Image URL link from a MAG product page, then press READ BACK">
+        <div class="row" style="flex-wrap:wrap">
+          <button class="btn" id="b-read">READ BACK</button>
+          <button class="btn" id="b-test">TEST TEMPLATE</button>
+          <button class="btn" id="b-copy">COPY FRAME URL</button>
+          <button class="btn" id="b-browse">BROWSE DIRECTORY</button>
+          <button class="btn" id="b-find">FIND PATTERN</button>
+          <button class="btn danger" id="b-reset">RESET TO DEFAULTS</button>
+        </div>
+        <div class="probe" id="probe">Nothing tested yet.</div>
         <div id="finder"></div>
       </div>
 
       <div class="grp">
         <span class="grp-k">Presets</span>
         <div class="row" style="flex-wrap:wrap">
-          <select class="sel" id="i-preset" style="min-width:220px"></select>
+          <select class="sel" id="i-preset" style="min-width:200px"></select>
           <button class="btn" id="b-apply">APPLY</button>
-          <input class="num" style="width:150px" type="text" id="i-pname" placeholder="name">
-          <button class="btn" id="b-save">SAVE CURRENT</button>
+          <input class="num" style="width:140px" type="text" id="i-pname" placeholder="name">
+          <button class="btn" id="b-save">SAVE</button>
           <button class="btn" id="b-del">DELETE</button>
         </div>
       </div>
 
       <p class="hint">
-        Keys &mdash; <code>space</code> play/pause &middot;
-        <code>J</code>/<code>K</code> or arrows step &middot;
-        <code>Home</code>/<code>End</code> ends &middot;
-        <code>C</code> compare previous run &middot;
-        <code>F</code> flicker &middot;
-        <code>R</code> re-detect latest run &middot;
-        <code>W</code> wall mode &middot;
-        <code>1</code>/<code>2</code>/<code>4</code> panels.
-        MAG stores images under <code>/data/&lt;model&gt;/&lt;YYYYMMDD&gt;/&lt;HH&gt;/&lt;area&gt;/</code>
-        <b>Browse directory</b> opens the folder for the selected run. Note that listing is
-        disabled on most of these, so a <b>403 Forbidden</b> there means the folder exists and
-        the path is right, while a MAG-branded <b>404</b> means it does not. <b>Publish lag</b>
-        only sets where the search for the newest run begins.
+        Keys &mdash; <code>space</code> play/pause &middot; <code>J</code>/<code>K</code> or arrows step
+        &middot; <code>Home</code>/<code>End</code> ends &middot; <code>C</code> previous run
+        &middot; <code>F</code> flicker &middot; <code>R</code> re-detect &middot; <code>W</code> wall
+        &middot; <code>1</code>/<code>2</code>/<code>4</code> panels.
       </p>
     </div>
   </details>
@@ -545,7 +524,7 @@ var CFG_VERSION = 6;
 
 /* Shown in the header. If this is not the number quoted in chat, the browser or
    the Pages CDN is serving a cached copy - hard reload, or add ?v=N to the URL. */
-var BUILD = "7";
+var BUILD = "8";
 
 var BUILTIN_PRESETS = [
   { name:"NCEP MAG - HRRR CONUS", tpl:DEFAULT_TPL, model:"hrrr", area:"conus",
@@ -570,7 +549,8 @@ var S = {
   timer:null, flickTimer:null,
   frames:{}, loadedCount:0, missingCount:0,
   gen:0,
-  watch:false, watchTimer:null, wall:false, migrated:false, booted:false
+  watch:false, watchTimer:null, wall:false, migrated:false, booted:false,
+  span:null, situation:null
 };
 
 function $(id){ return document.getElementById(id); }
@@ -959,18 +939,50 @@ function maxFH(cycle){
   return m.maxFH;
 }
 
-/* Situations are filtered to whatever the selected model actually publishes. */
+/* One tab per question. Each carries per-model variants; the first variant whose
+   products all exist in the selected model's catalog is the one used, so the tab
+   name stays the same no matter which model is loaded. */
 var SITUATIONS = [
-  ["Convective", ["sim_radar_comp","echo_top","sfc_cape_cin","lightning"]],
-  ["Convective (RAP/NAM)", ["sim_radar_comp","cape_cin","helicity","precip_rate"]],
-  ["Terminal",   ["ceiling","vis","10m_wnd_sfc_gust","precip_rate_type"]],
-  ["Terminal (RAP/NAM)", ["vis","10m_wnd_sfc_gust","2m_dewp_10m_wnd","precip_p01"]],
-  ["Winter",     ["precip_rate_type","snow_total","2m_temp_10m_wnd","1000_500_thick"]],
-  ["Enroute",    ["250_wnd","300_wnd","500_vort_ht","700_rh_ht"]],
-  ["Enroute (RAP/GFS)", ["250_wnd_ht","300_wnd_ht","500_vort_ht","700_rh_ht"]],
-  ["Wind",       ["10m_wnd","10m_maxwnd","10m_wnd_sfc_gust","2m_temp_10m_wnd"]],
-  ["Synoptic",   ["1000_500_thick","500_vort_ht","850_temp_ht","precip_ptot"]]
+  ["Convective", [
+    ["sim_radar_comp","echo_top","sfc_cape_cin","lightning"],
+    ["sim_radar_comp","cape_cin","helicity","precip_rate"],
+    ["sim_radar_comp","precip_rate_type","500_vort_ht","850_temp_mslp_precip"]
+  ]],
+  ["Terminal", [
+    ["ceiling","vis","10m_wnd_sfc_gust","precip_rate_type"],
+    ["vis","10m_wnd_sfc_gust","2m_dewp_10m_wnd","precip_p01"],
+    ["10m_wnd_2m_temp","precip_rate_type","850_temp_mslp_precip","precip_p01"]
+  ]],
+  ["Winter", [
+    ["precip_rate_type","snow_total","2m_temp_10m_wnd","1000_500_thick"],
+    ["precip_p01","snow_total","2m_temp_10m_wnd","1000_500_thick"],
+    ["precip_rate_type","snodpth_chng","1000_500_thick","850_temp_mslp_precip"]
+  ]],
+  ["Enroute", [
+    ["250_wnd","300_wnd","500_vort_ht","700_rh_ht"],
+    ["250_wnd_ht","300_wnd_ht","500_vort_ht","700_rh_ht"]
+  ]],
+  ["Wind", [
+    ["10m_wnd","10m_maxwnd","10m_wnd_sfc_gust","2m_temp_10m_wnd"],
+    ["10m_wnd_sfc_gust","2m_temp_10m_wnd","250_wnd_ht","850_temp_ht"],
+    ["10m_wnd_precip","10m_wnd_2m_temp","250_wnd_ht","850_temp_ht"]
+  ]],
+  ["Synoptic", [
+    ["1000_500_thick","500_vort_ht","850_temp_ht","precip_ptot"],
+    ["1000_500_thick","500_vort_ht","850_temp_mslp_precip","precip_ptot"]
+  ]]
 ];
+
+/* First variant this model can actually draw, or null. */
+function situationParams(entry){
+  var vars = entry[1];
+  for(var v=0;v<vars.length;v++){
+    var ok = true;
+    for(var i=0;i<4;i++){ if(!catalogHas(vars[v][i])){ ok = false; break; } }
+    if(ok){ return vars[v]; }
+  }
+  return null;
+}
 
 /* Templates corrected by READ BACK are remembered per model. */
 function learnedTpl(id){
@@ -1061,6 +1073,8 @@ function applyModel(id, keepParams){
   $("i-f1").value = String(m.maxFH);
   $("i-fs").value = String(m.step);
   $("b-sub").disabled = !m.sub;
+  S.span = "full";
+  markSpan();
 
   S.cycle = null;
   persist();
@@ -1434,30 +1448,30 @@ function buildSituations(){
   var wrap = $("sit");
   wrap.innerHTML = "";
   var shown = 0;
-  SITUATIONS.forEach(function(pair){
-    /* only offer sets this model actually publishes */
-    var ok = true;
-    for(var i=0;i<4;i++){ if(!catalogHas(pair[1][i])){ ok = false; } }
-    if(!ok){ return; }
+  SITUATIONS.forEach(function(entry){
+    var params = situationParams(entry);
+    if(!params){ return; }          /* this model cannot draw any variant */
     shown++;
     var b = el("button","chip sit");
-    b.textContent = pair[0];
-    b.title = pair[1].join(", ");
+    b.textContent = entry[0];
+    b.title = params.join(", ");
     b.addEventListener("click", function(){
       for(var p=0;p<4;p++){
         var txt = $("i-p"+p);
-        if(txt){ txt.value = pair[1][p] || ""; syncSelectFromText(p); }
+        if(txt){ txt.value = params[p] || ""; syncSelectFromText(p); }
       }
       if(S.panels !== 4){ setPanels(4, true); }
+      markSituation(entry[0]);
       persist(); writeHash(); loadAll();
     });
     wrap.appendChild(b);
   });
   if(!shown){
     var n = el("span","hint");
-    n.textContent = "No preset panel sets match this model's product list.";
+    n.textContent = "No preset views match this model.";
     wrap.appendChild(n);
   }
+  if(S.situation){ markSituation(S.situation); }
 }
 
 /* ============================================================
@@ -1735,6 +1749,81 @@ function resetToDefaults(){
   try { window.localStorage.removeItem("hrrrloop.cfg"); } catch(e){ /* ignore */ }
   try { location.replace(location.pathname + location.search); }
   catch(e){ location.hash = ""; location.reload(); }
+}
+
+/* ============================================================
+   span presets - replaces typing start / end / step
+   ============================================================ */
+function setSpan(kind){
+  var m = currentModel();
+  var top = maxFH(S.cycle);
+  var f0 = 0, f1, fs = m.step || 1;
+  if(kind === "6"){ f1 = Math.min(6, top); }
+  else if(kind === "12"){ f1 = Math.min(12, top); }
+  else if(kind === "15"){ f1 = Math.min(6, top); fs = 0.25; }
+  else { f1 = top; }
+  $("i-f0").value = String(f0);
+  $("i-f1").value = String(f1);
+  $("i-fs").value = String(fs);
+  S.span = kind;
+  markSpan();
+  persist();
+  writeHash();
+  loadAll();
+}
+
+function markSpan(){
+  var map = { "6":"b-span6", "12":"b-span12", "full":"b-spanfull", "15":"b-sub" };
+  for(var k in map){
+    if(!Object.prototype.hasOwnProperty.call(map,k)){ continue; }
+    var b = $(map[k]);
+    if(!b){ continue; }
+    var on = (S.span === k);
+    b.className = "btn" + (on ? " on" : "") + (b.disabled ? "" : "");
+  }
+}
+
+/* Infer which span button matches whatever the numbers currently say. */
+function inferSpan(){
+  var f0 = parseFloat($("i-f0").value), f1 = parseFloat($("i-f1").value),
+      fs = parseFloat($("i-fs").value);
+  if(f0 !== 0){ S.span = null; }
+  else if(fs === 0.25){ S.span = "15"; }
+  else if(f1 === 6){ S.span = "6"; }
+  else if(f1 === 12){ S.span = "12"; }
+  else if(f1 === maxFH(S.cycle)){ S.span = "full"; }
+  else { S.span = null; }
+  markSpan();
+}
+
+/* ============================================================
+   rate presets
+   ============================================================ */
+function setRate(fps){
+  S.fps = fps;
+  $("i-rate").value = String(fps);
+  $("l-rate").textContent = fps + " fps";
+  markRate();
+  persist();
+  if(S.playing){ stop(); play(); }
+}
+function markRate(){
+  var bs = document.querySelectorAll("[data-rate]");
+  for(var i=0;i<bs.length;i++){
+    var v = parseInt(bs[i].getAttribute("data-rate"),10);
+    bs[i].className = "btn" + (v === S.fps ? " on" : "");
+  }
+}
+
+/* ============================================================
+   situation tabs
+   ============================================================ */
+function markSituation(name){
+  S.situation = name;
+  var bs = document.querySelectorAll("#sit .chip");
+  for(var i=0;i<bs.length;i++){
+    bs[i].className = "chip sit" + (bs[i].textContent === name ? " on" : "");
+  }
 }
 
 /* ============================================================
@@ -2019,16 +2108,28 @@ function initInner(){
   $("b-find").addEventListener("click", runPatternFinder);
   $("b-browse").addEventListener("click", browseDirectory);
   $("b-reset").addEventListener("click", resetToDefaults);
-  $("b-sub").addEventListener("click", function(){
-    $("i-f0").value = "0"; $("i-f1").value = "6"; $("i-fs").value = "0.25";
-    persist(); writeHash(); loadAll();
+  $("b-sub").addEventListener("click", function(){ setSpan("15"); });
+  $("b-span6").addEventListener("click", function(){ setSpan("6"); });
+  $("b-span12").addEventListener("click", function(){ setSpan("12"); });
+  $("b-spanfull").addEventListener("click", function(){ setSpan("full"); });
+  $("b-gear").addEventListener("click", function(){
+    var d = $("drawer");
+    d.open = !d.open;
+    if(d.open){ d.scrollIntoView({block:"nearest"}); }
   });
+  var rbs = document.querySelectorAll("[data-rate]");
+  for(var rr=0;rr<rbs.length;rr++){
+    rbs[rr].addEventListener("click", function(){
+      setRate(parseInt(this.getAttribute("data-rate"),10));
+    });
+  }
   $("i-size").addEventListener("change", function(){ persist(); writeHash(); loadAll(); });
   $("i-lat").addEventListener("change", function(){ persist(); detectLatest(); });
 
   $("i-rate").addEventListener("input", function(){
     S.fps = parseInt(this.value,10);
     $("l-rate").textContent = S.fps + " fps";
+    markRate();
     persist();
     if(S.playing){ stop(); play(); }
   });
@@ -2081,6 +2182,8 @@ function initInner(){
       "Products, range, and panel count were kept.");
   }
   buildStage();
+  inferSpan();
+  markRate();
   S.booted = true;
   if(needDefaults){ applyModel(currentModel().id, false); }
   else { detectLatest(); }
