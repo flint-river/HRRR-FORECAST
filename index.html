@@ -261,6 +261,25 @@ button,select,input[type=text]{font-family:var(--mono);font-size:12px}
 .chip.sit:hover{color:var(--text)}
 .chip.sit.on{color:var(--amber);border-bottom-color:var(--amber)}
 .slug.big .slug-v{font-size:21px}
+.subtabs{
+  display:flex;gap:0;overflow-x:auto;flex:0 0 auto;
+  background:var(--panel);border-bottom:1px solid var(--rule);
+}
+.subtabs[hidden]{display:none}
+.subchip{
+  background:none;border:0;border-right:1px solid var(--rule);
+  padding:9px 14px;cursor:pointer;text-align:left;white-space:nowrap;
+  display:flex;flex-direction:column;gap:2px;
+}
+.subchip b{font-size:12px;font-weight:500;color:var(--dim)}
+.subchip span{
+  font-family:var(--mono);font-size:9px;letter-spacing:.1em;
+  text-transform:uppercase;color:var(--rule);
+}
+.subchip:hover b{color:var(--text)}
+.subchip.on{background:var(--panel2)}
+.subchip.on b{color:var(--amber)}
+.subchip.on span{color:var(--dim)}
 .loadnote{
   font-family:var(--mono);font-size:11px;color:var(--dim);
   padding:0 4px;white-space:nowrap;
@@ -340,6 +359,8 @@ button,select,input[type=text]{font-family:var(--mono);font-size:12px}
     </div>
   </header>
 
+  <div class="subtabs" id="subtabs" hidden></div>
+
   <div class="bar">
     <div class="slug big">
       <span class="slug-k">Valid</span>
@@ -379,6 +400,12 @@ button,select,input[type=text]{font-family:var(--mono);font-size:12px}
       <button class="btn" id="b-sub" title="15-minute frames">15 MIN</button>
     </div>
 
+    <div class="seg" id="panelseg">
+      <button class="btn on" data-pan="1">1</button>
+      <button class="btn" data-pan="2">2</button>
+      <button class="btn" data-pan="4">4</button>
+    </div>
+
     <button class="btn cmp" id="b-cmp" title="Same valid time from the previous run (C)">VS LAST RUN</button>
 
     <div class="seg" id="rates">
@@ -409,10 +436,6 @@ button,select,input[type=text]{font-family:var(--mono);font-size:12px}
         <span class="grp-k">Area and panels</span>
         <div class="row">
           <select class="sel" id="i-areasel" aria-label="Area"></select>
-          <span class="grp-k">Panels</span>
-          <button class="btn on" data-pan="1">1</button>
-          <button class="btn" data-pan="2">2</button>
-          <button class="btn" data-pan="4">4</button>
           <span class="vflag" id="s-verified">&nbsp;</span>
         </div>
       </div>
@@ -574,7 +597,7 @@ var CFG_VERSION = 6;
 
 /* Shown in the header. If this is not the number quoted in chat, the browser or
    the Pages CDN is serving a cached copy - hard reload, or add ?v=N to the URL. */
-var BUILD = "11";
+var BUILD = "12";
 
 var BUILTIN_PRESETS = [
   { name:"NCEP MAG - HRRR CONUS", tpl:DEFAULT_TPL, model:"hrrr", area:"conus",
@@ -600,7 +623,7 @@ var S = {
   frames:{}, loadedCount:0, missingCount:0,
   gen:0,
   watch:false, watchTimer:null, wall:false, migrated:false, booted:false,
-  span:null, situation:null, zoom:null
+  span:null, situation:null, zoom:null, sitParams:null
 };
 
 function $(id){ return document.getElementById(id); }
@@ -1539,9 +1562,9 @@ function buildSituations(){
         var txt = $("i-p"+p);
         if(txt){ txt.value = params[p] || ""; syncSelectFromText(p); }
       }
-      if(S.panels !== 4){ setPanels(4, true); }
+      S.sitParams = params;
       markSituation(entry[0]);
-      persist(); writeHash(); loadAll();
+      persist(); writeHash(); loadAll(); buildSubtabs();
     });
     wrap.appendChild(b);
   });
@@ -1957,7 +1980,7 @@ function goHome(){
   if(S.compare){ setCompare(false); }
   var d = $("drawer");
   if(d){ d.open = false; }
-  if(S.panels !== 4){ setPanels(4, true); }
+  if(S.panels !== 1){ setPanels(1, true); }
   applyZoom();
   var tab = document.querySelector("#sit .chip.on") || document.querySelector("#sit .chip");
   if(tab){ tab.click(); }
@@ -1973,6 +1996,42 @@ function escapeOne(){
   var d = $("drawer");
   if(d && d.open){ d.open = false; return; }
   goHome();
+}
+
+/* ============================================================
+   single-panel product row
+
+   With one panel there is room for one product, so the other three from the
+   chosen view become a row of buttons instead of disappearing.
+   ============================================================ */
+function buildSubtabs(){
+  var wrap = $("subtabs");
+  if(!wrap){ return; }
+  if(S.panels !== 1 || !S.sitParams){
+    wrap.hidden = true;
+    wrap.innerHTML = "";
+    return;
+  }
+  wrap.hidden = false;
+  wrap.innerHTML = "";
+  var cur = paramFor(0);
+  S.sitParams.forEach(function(name){
+    if(!name){ return; }
+    var b = el("button","subchip" + (name === cur ? " on" : ""));
+    var t = el("b"); t.textContent = productLabel(name);
+    var r = el("span"); r.textContent = name;
+    b.appendChild(t); b.appendChild(r);
+    b.addEventListener("click", function(){
+      var f = $("i-p0");
+      if(!f){ return; }
+      f.value = name;
+      syncSelectFromText(0);
+      persist(); writeHash();
+      loadAll();
+      buildSubtabs();
+    });
+    wrap.appendChild(b);
+  });
 }
 
 /* ============================================================
@@ -2208,6 +2267,7 @@ function setPanels(n,quiet){
   }
   syncPanelFields();
   syncCustomFields();
+  buildSubtabs();
   if(!quiet){ persist(); writeHash(); loadAll(); }
 }
 
@@ -2342,9 +2402,11 @@ function initInner(){
   else { detectLatest(); }
   /* open on a real view, after model defaults have been applied */
   if(firstVisit && !S.situation){
+    setPanels(1, true);
     var tab = document.querySelector("#sit .chip");
     if(tab){ tab.click(); }
   }
+  buildSubtabs();
 }
 
 /* A throw partway through setup used to leave controls unwired and silent.
