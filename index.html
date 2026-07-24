@@ -231,6 +231,27 @@ button,select,input[type=text]{font-family:var(--mono);font-size:12px}
   padding:0 12px;background:var(--panel2);border-bottom:1px solid var(--rule);
 }
 .tabs{display:flex;gap:0;overflow-x:auto;flex:1 1 auto}
+.home{
+  display:flex;flex-direction:column;gap:1px;align-items:flex-start;
+  background:none;border:0;border-right:1px solid var(--rule);
+  padding:9px 16px 9px 4px;margin-right:8px;cursor:pointer;flex:0 0 auto;
+}
+.home b{font-size:12px;letter-spacing:.1em;color:var(--amber);font-weight:600}
+.home span{
+  font-family:var(--mono);font-size:9px;letter-spacing:.14em;
+  text-transform:uppercase;color:var(--dim);
+}
+.home:hover span{color:var(--text)}
+.home:focus-visible{outline:2px solid var(--amber);outline-offset:-2px}
+.wallout{
+  display:none;position:fixed;top:10px;right:12px;z-index:40;
+  background:var(--panel2);color:var(--text);
+  border:1px solid var(--amber);border-radius:2px;
+  padding:7px 12px;font-family:var(--mono);font-size:11px;
+  letter-spacing:.1em;cursor:pointer;opacity:.55;
+}
+.wallout:hover{opacity:1}
+.wallout.on{display:block}
 .topright{display:flex;align-items:center;gap:8px;flex:0 0 auto;padding:7px 0}
 .chip.sit{
   background:none;border:0;border-bottom:2px solid transparent;border-radius:0;
@@ -309,6 +330,9 @@ button,select,input[type=text]{font-family:var(--mono);font-size:12px}
 <div class="app" id="app">
 
   <header class="top">
+    <button class="home" id="b-home" title="Back to the default view (Esc)">
+      <b>HRRR LOOP</b><span>home</span>
+    </button>
     <div class="tabs" id="sit"></div>
     <div class="topright">
       <select class="sel" id="i-modelsel" aria-label="Model"></select>
@@ -341,6 +365,8 @@ button,select,input[type=text]{font-family:var(--mono);font-size:12px}
   <main class="stage p1" id="stage"></main>
 
   <div class="bay" id="bay-wrap"><div class="bay-scroll" id="bay"></div></div>
+
+  <button class="wallout" id="b-wallout" hidden>EXIT WALL MODE</button>
 
   <div class="deck">
     <button class="btn wide play" id="b-play" title="Play / pause (space)">PLAY</button>
@@ -548,7 +574,7 @@ var CFG_VERSION = 6;
 
 /* Shown in the header. If this is not the number quoted in chat, the browser or
    the Pages CDN is serving a cached copy - hard reload, or add ?v=N to the URL. */
-var BUILD = "9";
+var BUILD = "11";
 
 var BUILTIN_PRESETS = [
   { name:"NCEP MAG - HRRR CONUS", tpl:DEFAULT_TPL, model:"hrrr", area:"conus",
@@ -1392,6 +1418,9 @@ function toggle(){ if(S.playing){ stop(); } else { play(); } }
 function setCompare(on){
   S.compare = on;
   $("b-cmp").className = "btn cmp" + (on ? " on" : "");
+  /* set the flag here too - updateSlugs bails out when no cycle is known yet */
+  var cf = $("s-flag");
+  if(cf){ cf.hidden = !on; }
   if(on){ loadCompareSet(); }
   show(S.idx);
 }
@@ -1560,6 +1589,8 @@ function checkForNewRun(){
 function setWall(on){
   S.wall = on;
   $("app").className = "app" + (on ? " wall" : "");
+  var x = $("b-wallout");
+  if(x){ x.hidden = !on; x.className = on ? "wallout on" : "wallout"; }
   $("b-wall").className = "btn ghost" + (on ? " on" : "");
   if(on){
     if(!S.watch){ setWatch(true); }
@@ -1917,6 +1948,34 @@ function showLoading(){
 }
 
 /* ============================================================
+   home - back to the default view without wiping saved settings
+   ============================================================ */
+function goHome(){
+  S.zoom = null;
+  if(S.wall){ setWall(false); }
+  if(S.flicker){ toggleFlicker(); }
+  if(S.compare){ setCompare(false); }
+  var d = $("drawer");
+  if(d){ d.open = false; }
+  if(S.panels !== 4){ setPanels(4, true); }
+  applyZoom();
+  var tab = document.querySelector("#sit .chip.on") || document.querySelector("#sit .chip");
+  if(tab){ tab.click(); }
+  else { loadAll(); }
+  setProbe("", "Nothing tested yet.");
+  window.scrollTo(0,0);
+}
+
+/* Esc backs out one layer at a time, innermost first. */
+function escapeOne(){
+  if(S.zoom !== null){ S.zoom = null; applyZoom(); return; }
+  if(S.wall){ setWall(false); return; }
+  var d = $("drawer");
+  if(d && d.open){ d.open = false; return; }
+  goHome();
+}
+
+/* ============================================================
    verification
    ============================================================ */
 function setProbe(cls,html){
@@ -2202,6 +2261,8 @@ function initInner(){
   $("b-span6").addEventListener("click", function(){ setSpan("6"); });
   $("b-span12").addEventListener("click", function(){ setSpan("12"); });
   $("b-spanfull").addEventListener("click", function(){ setSpan("full"); });
+  $("b-home").addEventListener("click", goHome);
+  $("b-wallout").addEventListener("click", function(){ setWall(false); });
   $("b-gear").addEventListener("click", function(){
     var d = $("drawer");
     d.open = !d.open;
@@ -2258,8 +2319,7 @@ function initInner(){
     else if(k === "f" || k === "F"){ toggleFlicker(); }
     else if(k === "r" || k === "R"){ detectLatest(); }
     else if(k === "w" || k === "W"){ setWall(!S.wall); }
-    else if(k === "Escape" && S.zoom !== null){ S.zoom = null; applyZoom(); }
-    else if(k === "Escape" && S.wall){ setWall(false); }
+    else if(k === "Escape"){ escapeOne(); }
     else if(k === "1"){ setPanels(1); }
     else if(k === "2"){ setPanels(2); }
     else if(k === "4"){ setPanels(4); }
