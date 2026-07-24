@@ -65,6 +65,11 @@ body{
 .stage.p1{grid-template-columns:1fr;grid-template-rows:1fr}
 .stage.p2{grid-template-columns:1fr 1fr;grid-template-rows:1fr}
 .stage.p4{grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr}
+.stage.zoom{grid-template-columns:1fr !important;grid-template-rows:1fr !important}
+.stage.zoom .pane{display:none}
+.stage.zoom .pane.zoomed{display:block}
+.pane.zoomable{cursor:zoom-in}
+.pane.zoomed{cursor:zoom-out}
 .pane{
   position:relative;min-width:0;min-height:0;
   background:var(--panel);border:1px solid var(--rule);border-radius:2px;
@@ -72,11 +77,16 @@ body{
 }
 .pane-tag{
   position:absolute;top:0;left:0;z-index:3;
-  padding:4px 8px;font-family:var(--mono);font-size:10px;
-  letter-spacing:.1em;text-transform:uppercase;
-  background:rgba(10,15,20,.82);color:var(--amber);
+  padding:5px 10px;background:rgba(10,15,20,.86);
   border-right:1px solid var(--rule);border-bottom:1px solid var(--rule);
-  pointer-events:none;
+  pointer-events:none;display:flex;flex-direction:column;gap:1px;
+}
+.pane-tag b{
+  font-size:12px;font-weight:600;color:var(--text);letter-spacing:.01em;
+}
+.pane-tag span{
+  font-family:var(--mono);font-size:9px;letter-spacing:.1em;
+  text-transform:uppercase;color:var(--dim);
 }
 .pane-imgs{position:absolute;inset:0}
 .pane-imgs img{
@@ -106,8 +116,15 @@ body{
   border-top:0;border-left:0;border-bottom:0;
 }
 .cell:focus-visible{outline:2px solid var(--amber);outline-offset:-2px}
-.cell-fh{font-size:13px;color:var(--text);line-height:1.1}
+.cell-fh{font-size:14px;color:var(--text);line-height:1.1;letter-spacing:.02em}
 .cell-z{font-size:10px;color:var(--dim);margin-top:2px;line-height:1.1}
+.cell.now{background:rgba(72,207,230,.10)}
+.cell.now .cell-fh{color:var(--cyan)}
+.cell.now::after{
+  content:"NOW";position:absolute;top:2px;right:3px;
+  font-size:8px;letter-spacing:.1em;color:var(--cyan);
+}
+.cell{position:relative}
 .cell-state{height:3px;margin-top:6px;background:var(--rule)}
 .cell.st-loading .cell-state{background:var(--dim)}
 .cell.st-ok .cell-state{background:var(--green)}
@@ -223,6 +240,11 @@ button,select,input[type=text]{font-family:var(--mono);font-size:12px}
 .chip.sit:hover{color:var(--text)}
 .chip.sit.on{color:var(--amber);border-bottom-color:var(--amber)}
 .slug.big .slug-v{font-size:21px}
+.loadnote{
+  font-family:var(--mono);font-size:11px;color:var(--dim);
+  padding:0 4px;white-space:nowrap;
+}
+.flag.zoomhint{border-color:var(--dim);color:var(--dim)}
 .seg{display:flex;gap:0}
 .seg .btn{border-radius:0;border-right-width:0}
 .seg .btn:first-child{border-radius:2px 0 0 2px}
@@ -310,9 +332,10 @@ button,select,input[type=text]{font-family:var(--mono);font-size:12px}
       <span class="slug-sub" id="s-runsub">detecting</span>
     </div>
     <div class="spacer"></div>
-    <span class="flag stale" id="s-stale" hidden>STALE &mdash; CHECK CYCLE</span>
+    <span class="flag stale" id="s-stale" hidden>OLD DATA &mdash; CHECK RUN</span>
     <span class="flag watch" id="s-watch" hidden>WATCHING</span>
     <span class="flag" id="s-flag" hidden>PREVIOUS RUN</span>
+    <span class="flag zoomhint" id="s-zoom" hidden>ZOOMED &mdash; CLICK PANEL OR PRESS ESC</span>
   </div>
 
   <main class="stage p1" id="stage"></main>
@@ -321,15 +344,16 @@ button,select,input[type=text]{font-family:var(--mono);font-size:12px}
 
   <div class="deck">
     <button class="btn wide play" id="b-play" title="Play / pause (space)">PLAY</button>
+    <span class="loadnote" id="s-load" hidden></span>
 
     <div class="seg" id="spans">
       <button class="btn" id="b-span6">6 H</button>
       <button class="btn" id="b-span12">12 H</button>
-      <button class="btn" id="b-spanfull">FULL RUN</button>
+      <button class="btn" id="b-spanfull">WHOLE RUN</button>
       <button class="btn" id="b-sub" title="15-minute frames">15 MIN</button>
     </div>
 
-    <button class="btn cmp" id="b-cmp" title="Previous run, same valid time (C)">PREV RUN</button>
+    <button class="btn cmp" id="b-cmp" title="Same valid time from the previous run (C)">VS LAST RUN</button>
 
     <div class="seg" id="rates">
       <button class="btn" data-rate="3">SLOW</button>
@@ -524,7 +548,7 @@ var CFG_VERSION = 6;
 
 /* Shown in the header. If this is not the number quoted in chat, the browser or
    the Pages CDN is serving a cached copy - hard reload, or add ?v=N to the URL. */
-var BUILD = "8";
+var BUILD = "9";
 
 var BUILTIN_PRESETS = [
   { name:"NCEP MAG - HRRR CONUS", tpl:DEFAULT_TPL, model:"hrrr", area:"conus",
@@ -550,7 +574,7 @@ var S = {
   frames:{}, loadedCount:0, missingCount:0,
   gen:0,
   watch:false, watchTimer:null, wall:false, migrated:false, booted:false,
-  span:null, situation:null
+  span:null, situation:null, zoom:null
 };
 
 function $(id){ return document.getElementById(id); }
@@ -923,6 +947,18 @@ function currentModel(){
 }
 function currentCatalog(){ return currentModel().cat || CAT_HRRR; }
 
+/* MAG's parameter name in plain words, for labelling panels. */
+function productLabel(name){
+  if(!name){ return ""; }
+  var c = currentCatalog();
+  for(var i=0;i<c.length;i++){
+    for(var j=0;j<c[i][1].length;j++){
+      if(c[i][1][j][0] === name){ return c[i][1][j][1]; }
+    }
+  }
+  return name;
+}
+
 function catalogHas(name){
   var c = currentCatalog();
   for(var i=0;i<c.length;i++){
@@ -1189,9 +1225,11 @@ function buildStage(){
     var pane = el("div","pane");
     pane.setAttribute("data-p", String(p));
     var tag = el("div","pane-tag");
-    tag.textContent = ($("i-model").value.trim() || "model") + "  " +
-                      ($("i-area").value.trim() || "") + "  -  " +
-                      (paramFor(p) || "no parameter set");
+    var nm = el("b");
+    nm.textContent = productLabel(paramFor(p)) || "No product selected";
+    var raw = el("span");
+    raw.textContent = paramFor(p) || "";
+    tag.appendChild(nm); tag.appendChild(raw);
     pane.appendChild(tag);
     pane.appendChild(el("div","pane-imgs"));
     var em = el("div","pane-empty");
@@ -1199,9 +1237,13 @@ function buildStage(){
     em.innerHTML = "<b>NO IMAGE</b><span>Nothing loaded at this forecast hour.</span>";
     em.style.display = "none";
     pane.appendChild(em);
+    (function(idx){
+      pane.addEventListener("click", function(){ toggleZoom(idx); });
+    })(p);
     st.appendChild(pane);
   }
   syncPanelFields();
+  applyZoom();
 }
 
 function syncPanelFields(){
@@ -1221,9 +1263,16 @@ function buildBay(){
     var c = el("button","cell" + (fh > m ? " beyond" : ""));
     c.setAttribute("data-fh", String(fh));
     c.setAttribute("data-i", String(i));
-    var a = el("div","cell-fh"); a.textContent = fhLabel(fh);
+    var v = S.cycle ? validDate(S.cycle,fh) : null;
+    var a = el("div","cell-fh");
+    a.textContent = v ? zShort(v) : "--";
     var b = el("div","cell-z");
-    b.textContent = S.cycle ? zShort(validDate(S.cycle,fh)) : "--";
+    b.textContent = fhLabel(fh);
+    if(v){
+      c.title = zLabel(v) + "   " + etLabel(v) + "   " + fhLabel(fh);
+      var diff = Math.abs(v.getTime() - Date.now());
+      if(diff < 30*60000){ c.className += " now"; }
+    }
     var s = el("div","cell-state");
     c.appendChild(a); c.appendChild(b); c.appendChild(s);
     c.addEventListener("click", function(){
@@ -1310,6 +1359,7 @@ function updateSlugs(){
   setStatus("s-validet", etLabel(v));
   setStatus("s-frames", S.loadedCount + " / " + (S.fhList.length * S.panels));
   setStatus("s-missing", S.missingCount ? (S.missingCount + " missing") : "\u00A0");
+  showLoading();
   $("s-flag").hidden = !S.compare;
 }
 
@@ -1827,6 +1877,46 @@ function markSituation(name){
 }
 
 /* ============================================================
+   click a panel to look closely, click again to come back
+   ============================================================ */
+function toggleZoom(i){
+  if(S.panels < 2){ return; }
+  S.zoom = (S.zoom === i) ? null : i;
+  applyZoom();
+}
+
+function applyZoom(){
+  var st = $("stage");
+  if(!st){ return; }
+  st.className = "stage p" + S.panels + (S.zoom !== null ? " zoom" : "");
+  var panes = st.querySelectorAll(".pane");
+  for(var i=0;i<panes.length;i++){
+    var on = (S.zoom !== null && parseInt(panes[i].getAttribute("data-p"),10) === S.zoom);
+    panes[i].className = "pane" + (on ? " zoomed" : "") +
+                         (S.panels > 1 && S.zoom === null ? " zoomable" : "");
+  }
+  var h = $("s-zoom");
+  if(h){ h.hidden = (S.zoom === null); }
+}
+
+/* ============================================================
+   loading progress, so a slow load does not look like a dead app
+   ============================================================ */
+function showLoading(){
+  var n = $("s-load");
+  if(!n){ return; }
+  var total = S.fhList.length * S.panels;
+  var done = S.loadedCount + S.missingCount;
+  if(!total || done >= total){
+    n.textContent = "";
+    n.hidden = true;
+  } else {
+    n.hidden = false;
+    n.textContent = "loading " + done + " / " + total;
+  }
+}
+
+/* ============================================================
    verification
    ============================================================ */
 function setProbe(cls,html){
@@ -2168,6 +2258,7 @@ function initInner(){
     else if(k === "f" || k === "F"){ toggleFlicker(); }
     else if(k === "r" || k === "R"){ detectLatest(); }
     else if(k === "w" || k === "W"){ setWall(!S.wall); }
+    else if(k === "Escape" && S.zoom !== null){ S.zoom = null; applyZoom(); }
     else if(k === "Escape" && S.wall){ setWall(false); }
     else if(k === "1"){ setPanels(1); }
     else if(k === "2"){ setPanels(2); }
@@ -2184,9 +2275,16 @@ function initInner(){
   buildStage();
   inferSpan();
   markRate();
+  applyZoom();
+  var firstVisit = !store.get("hrrrloop.cfg");
   S.booted = true;
   if(needDefaults){ applyModel(currentModel().id, false); }
   else { detectLatest(); }
+  /* open on a real view, after model defaults have been applied */
+  if(firstVisit && !S.situation){
+    var tab = document.querySelector("#sit .chip");
+    if(tab){ tab.click(); }
+  }
 }
 
 /* A throw partway through setup used to leave controls unwired and silent.
