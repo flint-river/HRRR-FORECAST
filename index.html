@@ -30,9 +30,9 @@ body{
 
 /* ---------- status bar ---------- */
 .bar{
-  display:flex;align-items:stretch;
+  position:relative;display:flex;align-items:center;
   background:var(--panel);border-bottom:1px solid var(--rule);
-  flex:0 0 auto;overflow-x:auto;
+  flex:0 0 auto;min-height:38px;padding:0 12px;
 }
 .slug{
   display:flex;flex-direction:column;justify-content:center;
@@ -56,6 +56,7 @@ body{
   white-space:nowrap;
 }
 .flag[hidden]{display:none}
+.flagwrap{position:relative;z-index:2;margin-left:auto;display:flex;gap:8px}
 
 /* ---------- stage ---------- */
 .stage{
@@ -277,10 +278,11 @@ button,select,input[type=text]{font-family:var(--mono);font-size:12px}
 .chip.sit:hover{color:var(--text)}
 .chip.sit.on{color:var(--amber);border-bottom-color:var(--amber)}
 .validbar{
-  flex:1 1 auto;text-align:left;
+  position:absolute;left:0;right:0;
+  text-align:center;pointer-events:none;
   font-family:var(--mono);font-size:17px;letter-spacing:.02em;
-  color:var(--cyan);padding:2px 4px;
-  white-space:nowrap;overflow-x:auto;
+  color:var(--cyan);
+  white-space:nowrap;
 }
 .deck{gap:10px}
 .sep{width:1px;align-self:stretch;background:var(--rule);margin:2px 2px}
@@ -403,10 +405,12 @@ button,select,input[type=text]{font-family:var(--mono);font-size:12px}
   <div class="bar">
     <div class="validbar" id="s-validline">&mdash;</div>
     <div class="spacer"></div>
+    <span class="flagwrap">
     <span class="flag stale" id="s-stale" hidden>OLD DATA &mdash; CHECK RUN</span>
     <span class="flag watch" id="s-watch" hidden>AUTO-ADVANCE-ON</span>
     <span class="flag" id="s-flag" hidden>PREVIOUS RUN</span>
     <span class="flag zoomhint" id="s-zoom" hidden>ZOOMED &mdash; CLICK PANEL OR PRESS ESC</span>
+    </span>
   </div>
 
   <main class="stage p1" id="stage"></main>
@@ -635,7 +639,7 @@ var CFG_VERSION = 9;
 
 /* Shown in the header. If this is not the number quoted in chat, the browser or
    the Pages CDN is serving a cached copy - hard reload, or add ?v=N to the URL. */
-var BUILD = "22";
+var BUILD = "23";
 
 var BUILTIN_PRESETS = [
   { name:"NCEP MAG - HRRR CONUS", tpl:DEFAULT_TPL, model:"hrrr", area:"conus",
