@@ -447,13 +447,6 @@ button,select,input[type=text]{font-family:var(--mono);font-size:12px}
       <button class="btn" data-pan="4">4</button>
     </div>
 
-    <div class="seg" id="spans" title="How far ahead to loop">
-      <button class="btn" id="b-span6">6 H</button>
-      <button class="btn" id="b-span12">12 H</button>
-      <button class="btn" id="b-spanfull">WHOLE</button>
-      <button class="btn" id="b-sub" title="15-minute frames">15 MIN</button>
-    </div>
-
     <div class="seg" id="rates" title="Loop speed">
       <button class="btn" data-rate="3">SLOW</button>
       <button class="btn" data-rate="6">MED</button>
@@ -653,7 +646,7 @@ var CFG_VERSION = 9;
 
 /* Shown in the header. If this is not the number quoted in chat, the browser or
    the Pages CDN is serving a cached copy - hard reload, or add ?v=N to the URL. */
-var BUILD = "20";
+var BUILD = "21";
 
 var BUILTIN_PRESETS = [
   { name:"NCEP MAG - HRRR CONUS", tpl:DEFAULT_TPL, model:"hrrr", area:"conus",
@@ -1310,7 +1303,6 @@ function applyProfile(profileId, keepParams){
   $("i-f0").value = "0";
   $("i-f1").value = String(profileMaxFH());
   $("i-fs").value = String(m.step);
-  $("b-sub").disabled = !m.sub;
   S.span = "full";
   markSpan();
 
@@ -2116,16 +2108,7 @@ function setSpan(kind){
   loadAll();
 }
 
-function markSpan(){
-  var map = { "6":"b-span6", "12":"b-span12", "full":"b-spanfull", "15":"b-sub" };
-  for(var k in map){
-    if(!Object.prototype.hasOwnProperty.call(map,k)){ continue; }
-    var b = $(map[k]);
-    if(!b){ continue; }
-    var on = (S.span === k);
-    b.className = "btn" + (on ? " on" : "") + (b.disabled ? "" : "");
-  }
-}
+function markSpan(){ /* span buttons removed; whole run is the default */ }
 
 /* Infer which span button matches whatever the numbers currently say. */
 function inferSpan(){
@@ -2571,7 +2554,6 @@ function initInner(){
   /* nothing usable came back from saved settings - note it, but finish wiring
      the UI first. Returning here would leave every button dead. */
   var needDefaults = !paramFor(0);
-  $("b-sub").disabled = !currentModel().sub;
   writeHash();
 
   $("b-play").addEventListener("click", toggle);
@@ -2606,10 +2588,6 @@ function initInner(){
   $("b-find").addEventListener("click", runPatternFinder);
   $("b-browse").addEventListener("click", browseDirectory);
   $("b-reset").addEventListener("click", resetToDefaults);
-  $("b-sub").addEventListener("click", function(){ setSpan("15"); });
-  $("b-span6").addEventListener("click", function(){ setSpan("6"); });
-  $("b-span12").addEventListener("click", function(){ setSpan("12"); });
-  $("b-spanfull").addEventListener("click", function(){ setSpan("full"); });
   $("b-home").addEventListener("click", goHome);
   $("b-wallout").addEventListener("click", function(){ setWall(false); });
   $("i-showmissing").addEventListener("change", function(){
