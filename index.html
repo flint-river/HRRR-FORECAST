@@ -252,7 +252,11 @@ button,select,input[type=text]{font-family:var(--mono);font-size:12px}
 }
 .wallout:hover{opacity:1}
 .wallout.on{display:block}
-.topright{display:flex;align-items:center;gap:8px;flex:0 0 auto;padding:7px 0}
+.topright{display:flex;align-items:center;gap:10px;flex:0 0 auto;padding:7px 0}
+.coverage{
+  font-family:var(--mono);font-size:10px;letter-spacing:.04em;
+  color:var(--dim);white-space:nowrap;
+}
 .chip.sit{
   background:none;border:0;border-bottom:2px solid transparent;border-radius:0;
   padding:13px 16px;font-size:12px;letter-spacing:.08em;text-transform:uppercase;
@@ -373,6 +377,7 @@ button,select,input[type=text]{font-family:var(--mono);font-size:12px}
     <div class="tabs" id="sit"></div>
     <div class="topright">
       <select class="sel" id="i-modelsel" aria-label="Model"></select>
+      <span class="coverage" id="s-coverage">&mdash;</span>
     </div>
   </header>
 
@@ -401,7 +406,7 @@ button,select,input[type=text]{font-family:var(--mono);font-size:12px}
 
   <div class="bay" id="bay-wrap"><div class="bay-scroll" id="bay"></div></div>
 
-  <button class="wallout" id="b-wallout" hidden>EXIT WALL MODE</button>
+  <button class="wallout" id="b-wallout" hidden>UN-ZOOM</button>
 
   <div class="deck">
     <div class="cluster">
@@ -644,7 +649,7 @@ var CFG_VERSION = 8;
 
 /* Shown in the header. If this is not the number quoted in chat, the browser or
    the Pages CDN is serving a cached copy - hard reload, or add ?v=N to the URL. */
-var BUILD = "14";
+var BUILD = "15";
 
 var BUILTIN_PRESETS = [
   { name:"NCEP MAG - HRRR CONUS", tpl:DEFAULT_TPL, model:"hrrr", area:"conus",
@@ -1019,43 +1024,35 @@ var CAT_GFS = [
 /* id, label, areas, cycle interval (h), extended-cycle interval and its max,
    normal max fh, default step, forecast-hour token, template, catalog, verified */
 var MODELS = [
-  { id:"hrrr", label:"HRRR - High Res Rapid Refresh", verified:true,
+  { id:"hrrr", label:"HRRR", verified:true,
     areas:["conus","alaska"], cyc:1, maxFH:18, extEvery:6, extMaxFH:48,
     step:1, fhTok:"FHM", tpl:TPL_FLAT, cat:CAT_HRRR, sub:true },
-  { id:"rap", label:"RAP - Rapid Refresh", verified:true,
+  { id:"rap", label:"RAP", verified:true,
     areas:["namer","conus","alaska"], cyc:1, maxFH:21, extEvery:6, extMaxFH:51,
     step:1, fhTok:"FH3", tpl:TPL_FLAT, cat:CAT_RAP },
-  { id:"gfs", label:"GFS - Global Forecast System", verified:true,
+  { id:"gfs", label:"GFS", verified:true,
     areas:["namer","conus","alaska","atlantic","east-pac","europe","asia",
            "arctic","polar","samer","north-pac","south-pac","india","africa","west-atl"],
-    cyc:6, maxFH:240, step:3, fhTok:"FH3", tpl:TPL_NESTED, cat:CAT_GFS },
-  { id:"nam", label:"NAM - North American Mesoscale", verified:false,
-    areas:["namer","conus","alaska","hawaii","puerto-rico"], cyc:6, maxFH:84,
-    step:3, fhTok:"FH3", tpl:TPL_FLAT, cat:CAT_RAP },
-  { id:"namhires", label:"NAM-HIRES - NAM nest", verified:false,
-    areas:["conus","alaska","hawaii","puerto-rico"], cyc:6, maxFH:60,
-    step:1, fhTok:"FH3", tpl:TPL_FLAT, cat:CAT_HRRR },
-  { id:"hiresw", label:"HIRESW - High Resolution Window", verified:false,
-    areas:["conus","alaska","hawaii","puerto-rico"], cyc:12, maxFH:48,
-    step:1, fhTok:"FH3", tpl:TPL_FLAT, cat:CAT_HRRR },
-  { id:"href", label:"HREF - High Res Ensemble Forecast", verified:false,
-    areas:["conus","alaska","hawaii","puerto-rico"], cyc:6, maxFH:48,
-    step:1, fhTok:"FH3", tpl:TPL_FLAT, cat:CAT_HRRR },
-  { id:"nbm", label:"NBM - National Blend of Models", verified:false,
-    areas:["conus","alaska","hawaii","puerto-rico"], cyc:1, maxFH:72,
-    step:1, fhTok:"FH3", tpl:TPL_FLAT, cat:CAT_RAP },
-  { id:"rtma", label:"RTMA - Real-Time Mesoscale Analysis", verified:false,
-    areas:["conus","alaska","hawaii","puerto-rico"], cyc:1, maxFH:0,
-    step:1, fhTok:"FH3", tpl:TPL_FLAT, cat:CAT_RAP },
-  { id:"sref", label:"SREF - Short Range Ensemble", verified:false,
-    areas:["namer","conus","alaska"], cyc:6, maxFH:87,
-    step:3, fhTok:"FH3", tpl:TPL_FLAT, cat:CAT_RAP },
-  { id:"gefs", label:"GEFS - Global Ensemble", verified:false,
-    areas:["namer","conus","atlantic","east-pac"], cyc:6, maxFH:384,
-    step:6, fhTok:"FH3", tpl:TPL_NESTED, cat:CAT_GFS },
-  { id:"firewx", label:"FIREWX - Fire Weather nest", verified:false,
-    areas:["conus"], cyc:6, maxFH:36, step:1, fhTok:"FH3", tpl:TPL_FLAT, cat:CAT_HRRR }
+    cyc:6, maxFH:240, step:3, fhTok:"FH3", tpl:TPL_NESTED, cat:CAT_GFS }
 ];
+
+/* Human coverage summary derived from the registry so it stays in sync. */
+function coverageText(m){
+  function span(h){
+    if(h <= 0){ return "analysis only"; }
+    var d = h/24;
+    var days = (h % 24 === 0) ? (d + (d===1?" day":" days"))
+             : (d >= 2 ? (Math.round(d*10)/10 + " days") : null);
+    return "out to " + h + " h" + (days ? " (" + days + ")" : "");
+  }
+  var base = span(m.maxFH);
+  if(m.extMaxFH && m.extMaxFH > m.maxFH){
+    base += ", " + m.extMaxFH + " h on 00/06/12/18Z";
+  }
+  var cadence = (m.cyc === 1) ? "hourly runs" : ("runs every " + m.cyc + " h");
+  var stepTxt = (m.step && m.step > 1) ? (", " + m.step + " h steps") : "";
+  return base + " - " + cadence + stepTxt;
+}
 
 function modelById(id){
   for(var i=0;i<MODELS.length;i++){ if(MODELS[i].id === id){ return MODELS[i]; } }
@@ -1189,6 +1186,11 @@ function fillAreaSelect(){
   }
 }
 
+function showCoverage(){
+  var n = $("s-coverage");
+  if(n){ n.textContent = coverageText(currentModel()); }
+}
+
 function showVerified(){
   var m = currentModel();
   var n = $("s-verified");
@@ -1210,6 +1212,7 @@ function applyModel(id, keepParams){
 
   fillAreaSelect();
   showVerified();
+  showCoverage();
   buildProductGrid();
   buildSituations();
 
@@ -2430,6 +2433,7 @@ function initInner(){
   fillModelSelect();
   fillAreaSelect();
   showVerified();
+  showCoverage();
   buildProductGrid();
   buildSituations();
   for(var s0=0;s0<4;s0++){ syncSelectFromText(s0); }
