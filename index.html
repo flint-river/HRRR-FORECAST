@@ -260,7 +260,25 @@ button,select,input[type=text]{font-family:var(--mono);font-size:12px}
 }
 .chip.sit:hover{color:var(--text)}
 .chip.sit.on{color:var(--amber);border-bottom-color:var(--amber)}
-.slug.big .slug-v{font-size:21px}
+.validbar{
+  flex:0 0 auto;text-align:center;
+  font-family:var(--mono);font-size:17px;letter-spacing:.02em;
+  color:var(--cyan);padding:10px 12px;
+  background:var(--ink);border-bottom:1px solid var(--rule);
+  white-space:nowrap;overflow-x:auto;
+}
+.cluster{display:flex;flex-direction:column;gap:4px;align-items:flex-start}
+.cl-k{
+  font-size:9px;letter-spacing:.16em;text-transform:uppercase;
+  color:var(--dim);padding-left:2px;
+}
+.chk{
+  display:flex;align-items:center;gap:8px;
+  font-size:12px;color:var(--text);cursor:pointer;
+}
+.chk input{width:15px;height:15px;accent-color:var(--amber)}
+.cell.gap{opacity:.3}
+.cell.gap .cell-fh{color:var(--dim)}
 .subtabs{
   display:flex;gap:0;overflow-x:auto;flex:0 0 auto;
   background:var(--panel);border-bottom:1px solid var(--rule);
@@ -355,18 +373,14 @@ button,select,input[type=text]{font-family:var(--mono);font-size:12px}
     <div class="tabs" id="sit"></div>
     <div class="topright">
       <select class="sel" id="i-modelsel" aria-label="Model"></select>
-      <button class="btn ghost" id="b-wall" title="Wall display mode (W)">WALL</button>
     </div>
   </header>
 
   <div class="subtabs" id="subtabs" hidden></div>
 
+  <div class="validbar" id="s-validline">&mdash;</div>
+
   <div class="bar">
-    <div class="slug big">
-      <span class="slug-k">Valid</span>
-      <span class="slug-v cyan" id="s-valid">&mdash;</span>
-      <span class="slug-sub" id="s-validet">&mdash;</span>
-    </div>
     <div class="slug">
       <span class="slug-k">Forecast hour</span>
       <span class="slug-v" id="s-fh">&mdash;</span>
@@ -390,32 +404,61 @@ button,select,input[type=text]{font-family:var(--mono);font-size:12px}
   <button class="wallout" id="b-wallout" hidden>EXIT WALL MODE</button>
 
   <div class="deck">
-    <button class="btn wide play" id="b-play" title="Play / pause (space)">PLAY</button>
-    <span class="loadnote" id="s-load" hidden></span>
-
-    <div class="seg" id="spans">
-      <button class="btn" id="b-span6">6 H</button>
-      <button class="btn" id="b-span12">12 H</button>
-      <button class="btn" id="b-spanfull">WHOLE RUN</button>
-      <button class="btn" id="b-sub" title="15-minute frames">15 MIN</button>
+    <div class="cluster">
+      <span class="cl-k">Time</span>
+      <div class="seg">
+        <button class="btn" id="b-first" title="First frame (Home)">&#x23EE;</button>
+        <button class="btn" id="b-step-back" title="Step back (J / left)">&#x25C0;</button>
+        <button class="btn wide play" id="b-play" title="Play / pause (space)">PLAY</button>
+        <button class="btn" id="b-step-fwd" title="Step forward (K / right)">&#x25B6;</button>
+        <button class="btn" id="b-last" title="Last frame (End)">&#x23ED;</button>
+        <button class="btn" id="b-now" title="Jump to the frame nearest now (N)">NOW</button>
+      </div>
+      <span class="loadnote" id="s-load" hidden></span>
     </div>
 
-    <div class="seg" id="panelseg">
-      <button class="btn on" data-pan="1">1</button>
-      <button class="btn" data-pan="2">2</button>
-      <button class="btn" data-pan="4">4</button>
+    <div class="cluster">
+      <span class="cl-k">Panels</span>
+      <div class="seg" id="panelseg">
+        <button class="btn on" data-pan="1">1</button>
+        <button class="btn" data-pan="2">2</button>
+        <button class="btn" data-pan="4">4</button>
+      </div>
     </div>
 
-    <button class="btn cmp" id="b-cmp" title="Same valid time from the previous run (C)">VS LAST RUN</button>
+    <div class="cluster">
+      <span class="cl-k">Span</span>
+      <div class="seg" id="spans">
+        <button class="btn" id="b-span6">6 H</button>
+        <button class="btn" id="b-span12">12 H</button>
+        <button class="btn" id="b-spanfull">WHOLE</button>
+        <button class="btn" id="b-sub" title="15-minute frames">15 MIN</button>
+      </div>
+    </div>
 
-    <div class="seg" id="rates">
-      <button class="btn" data-rate="3">SLOW</button>
-      <button class="btn" data-rate="6">MED</button>
-      <button class="btn" data-rate="12">FAST</button>
+    <div class="cluster">
+      <span class="cl-k">Speed</span>
+      <div class="seg" id="rates">
+        <button class="btn" data-rate="3">SLOW</button>
+        <button class="btn" data-rate="6">MED</button>
+        <button class="btn" data-rate="12">FAST</button>
+      </div>
+    </div>
+
+    <div class="cluster">
+      <span class="cl-k">Compare</span>
+      <button class="btn cmp" id="b-cmp" title="Same valid time from the previous run (C)">VS LAST RUN</button>
     </div>
 
     <div class="spacer"></div>
-    <button class="btn ghost" id="b-gear" title="Settings and diagnostics">SETTINGS</button>
+
+    <div class="cluster">
+      <span class="cl-k">View</span>
+      <div class="seg">
+        <button class="btn ghost" id="b-wall" title="Full-screen zoom (W)">ZOOM</button>
+        <button class="btn ghost" id="b-gear" title="Settings and diagnostics">SETTINGS</button>
+      </div>
+    </div>
   </div>
 
   <details class="src" id="drawer">
@@ -430,6 +473,14 @@ button,select,input[type=text]{font-family:var(--mono);font-size:12px}
           <span>Frames <b id="s-frames">0 / 0</b> <span id="s-missing">&nbsp;</span></span>
         </div>
         <div class="statrow"><span id="s-tpl" class="tplline">&mdash;</span></div>
+      </div>
+
+      <div class="grp">
+        <span class="grp-k">Strip</span>
+        <label class="chk">
+          <input type="checkbox" id="i-showmissing">
+          Show forecast hours that have no image (as greyed gaps)
+        </label>
       </div>
 
       <div class="grp">
@@ -473,10 +524,6 @@ button,select,input[type=text]{font-family:var(--mono);font-size:12px}
           <input class="num" type="text" id="i-f1" value="18" aria-label="End forecast hour">
           <input class="num" type="text" id="i-fs" value="1" aria-label="Step">
           <button class="btn" id="b-load">LOAD</button>
-          <button class="btn" id="b-first">|&lt;</button>
-          <button class="btn" id="b-prev">&lt;</button>
-          <button class="btn" id="b-next">&gt;</button>
-          <button class="btn" id="b-last">&gt;|</button>
         </div>
       </div>
 
@@ -593,11 +640,11 @@ var DEFAULT_LATENCY_MIN = 120;
 /* Bumped whenever the shipped template changes. Saved settings and shared links
    carry this stamp; anything older has its template discarded rather than
    allowed to override a fix. Everything else the user chose is kept. */
-var CFG_VERSION = 7;
+var CFG_VERSION = 8;
 
 /* Shown in the header. If this is not the number quoted in chat, the browser or
    the Pages CDN is serving a cached copy - hard reload, or add ?v=N to the URL. */
-var BUILD = "13";
+var BUILD = "14";
 
 var BUILTIN_PRESETS = [
   { name:"NCEP MAG - HRRR CONUS", tpl:DEFAULT_TPL, model:"hrrr", area:"conus",
@@ -623,7 +670,8 @@ var S = {
   frames:{}, loadedCount:0, missingCount:0,
   gen:0,
   watch:false, watchTimer:null, wall:false, migrated:false, booted:false,
-  span:null, situation:null, zoom:null, sitParams:null
+  span:null, situation:null, zoom:null, sitParams:null,
+  showMissing:false
 };
 
 function $(id){ return document.getElementById(id); }
@@ -639,6 +687,28 @@ function cycleStr(d){
 }
 function cycleLabel(d){ return pad(d.getUTCDate(),2)+"/"+pad(d.getUTCHours(),2)+"Z"; }
 function validDate(cycle,fh){ return new Date(cycle.getTime() + fh*3600000); }
+/* "Monday, July 27 @ 23:00 ET // Tuesday, July 28 @ 0300Z" - each side keeps
+   its own weekday and date because ET and Z can fall on different days. */
+function longValid(d){
+  var etDay, etDate, etTime, zParts;
+  try {
+    var etF = new Intl.DateTimeFormat("en-US",{ timeZone:"America/New_York",
+      weekday:"long", month:"long", day:"numeric" }).formatToParts(d);
+    var g = {}; etF.forEach(function(p){ g[p.type]=p.value; });
+    etDay = g.weekday; etDate = g.month + " " + g.day;
+    etTime = new Intl.DateTimeFormat("en-US",{ timeZone:"America/New_York",
+      hour:"2-digit", minute:"2-digit", hour12:false }).format(d);
+  } catch(e){ etDay=""; etDate=""; etTime=""; }
+  var zDay = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"][d.getUTCDay()];
+  var months = ["January","February","March","April","May","June","July",
+                "August","September","October","November","December"];
+  var zDate = months[d.getUTCMonth()] + " " + d.getUTCDate();
+  var zTime = pad(d.getUTCHours(),2) + pad(d.getUTCMinutes(),2) + "Z";
+  var et = etDay ? (etDay + ", " + etDate + " @ " + etTime + " ET") : "";
+  var z  = zDay + ", " + zDate + " @ " + zTime;
+  return et ? (et + "  //  " + z) : z;
+}
+
 function zLabel(d){
   return pad(d.getUTCDate(),2)+"/"+pad(d.getUTCHours(),2)+pad(d.getUTCMinutes(),2)+"Z";
 }
@@ -1227,6 +1297,7 @@ function queueFrame(p,fh,which,cycle){
       S.loadedCount++;
       markCell(fh,"ok");
       updateSlugs();
+      scheduleStripRebuild();
     }
     if(S.fhList.length && wantKeyFor(p) === key){ show(S.idx); }
   };
@@ -1237,6 +1308,7 @@ function queueFrame(p,fh,which,cycle){
       S.missingCount++;
       markCell(fh,"missing");
       updateSlugs();
+      scheduleStripRebuild();
     }
   };
 
@@ -1303,15 +1375,48 @@ function syncPanelFields(){
   }
 }
 
+/* Which forecast hours to show on the strip. A frame counts as present
+   until proven missing, so nothing is hidden before its load resolves;
+   with showMissing on, everything is shown and misses are marked as gaps. */
+function stripHours(){
+  if(S.showMissing){ return S.fhList.slice(); }
+  var out = [];
+  for(var i=0;i<S.fhList.length;i++){
+    var fh = S.fhList[i];
+    var st = frameStatus(fh);
+    if(st !== "missing"){ out.push(fh); }
+  }
+  return out.length ? out : S.fhList.slice();   /* never blank the strip */
+}
+
+/* Worst status across the panels at this forecast hour. */
+function frameStatus(fh){
+  var anyOk = false, anyLoading = false, all = 0, miss = 0;
+  for(var p=0;p<S.panels;p++){
+    var rec = S.frames[frameKey(p, fh, "cur")];
+    if(!rec){ anyLoading = true; continue; }
+    all++;
+    if(rec.status === "ok"){ anyOk = true; }
+    else if(rec.status === "loading"){ anyLoading = true; }
+    else if(rec.status === "missing"){ miss++; }
+  }
+  if(anyOk){ return "ok"; }
+  if(anyLoading){ return "loading"; }
+  if(all && miss === all){ return "missing"; }
+  return "loading";
+}
+
 function buildBay(){
   var bay = $("bay");
   bay.innerHTML = "";
   var m = maxFH(S.cycle);
-  for(var i=0;i<S.fhList.length;i++){
-    var fh = S.fhList[i];
+  var hours = stripHours();
+  for(var i=0;i<hours.length;i++){
+    var fh = hours[i];
     var c = el("button","cell" + (fh > m ? " beyond" : ""));
     c.setAttribute("data-fh", String(fh));
-    c.setAttribute("data-i", String(i));
+    c.setAttribute("data-i", String(S.fhList.indexOf(fh)));
+    if(S.showMissing && frameStatus(fh) === "missing"){ c.className += " gap"; }
     var v = S.cycle ? validDate(S.cycle,fh) : null;
     var a = el("div","cell-fh");
     a.textContent = v ? zShort(v) : "--";
@@ -1404,8 +1509,7 @@ function updateSlugs(){
   setStatus("s-run", cycleLabel(eff));
   setStatus("s-fh", fhLabel(effFh));
   var v = validDate(eff, effFh);
-  setStatus("s-valid", zLabel(v));
-  setStatus("s-validet", etLabel(v));
+  setStatus("s-validline", longValid(v));
   setStatus("s-frames", S.loadedCount + " / " + (S.fhList.length * S.panels));
   setStatus("s-missing", S.missingCount ? (S.missingCount + " missing") : "\u00A0");
   showLoading();
@@ -1614,7 +1718,8 @@ function setWall(on){
   $("app").className = "app" + (on ? " wall" : "");
   var x = $("b-wallout");
   if(x){ x.hidden = !on; x.className = on ? "wallout on" : "wallout"; }
-  $("b-wall").className = "btn ghost" + (on ? " on" : "");
+  var wb = $("b-wall");
+  if(wb){ wb.className = "btn ghost" + (on ? " on" : ""); wb.textContent = on ? "UNZOOM" : "ZOOM"; }
   if(on){
     if(!S.watch){ setWatch(true); }
     if(!S.playing){ play(); }
@@ -2038,6 +2143,47 @@ function buildSubtabs(){
 }
 
 /* ============================================================
+   NOW - move the time cursor to the frame nearest the clock
+   ============================================================ */
+function goNow(){
+  if(!S.cycle || !S.fhList.length){ return; }
+  stop();
+  var now = Date.now();
+  var best = 0, bestDiff = Infinity;
+  for(var i=0;i<S.fhList.length;i++){
+    var v = validDate(S.cycle, S.fhList[i]).getTime();
+    var diff = Math.abs(v - now);
+    if(diff < bestDiff){ bestDiff = diff; best = i; }
+  }
+  show(best);
+}
+
+/* ============================================================
+   strip rebuild - coalesced so a burst of loads redraws once
+   ============================================================ */
+function rebuildStrip(){
+  buildBay();
+  show(S.idx);
+}
+var _stripTimer = null;
+function scheduleStripRebuild(){
+  if(S.showMissing){ return; }   /* nothing hides, no need to redraw */
+  if(_stripTimer){ return; }
+  _stripTimer = setTimeout(function(){
+    _stripTimer = null;
+    var curFh = S.fhList[S.idx];
+    buildBay();
+    /* keep the cursor on the same forecast hour if it survived the filter */
+    var stillThere = $("bay").querySelector('.cell[data-fh="'+curFh+'"]');
+    if(!stillThere){
+      var cells = $("bay").querySelectorAll(".cell");
+      if(cells.length){ S.idx = parseInt(cells[0].getAttribute("data-i"),10); }
+    }
+    show(S.idx);
+  }, 400);
+}
+
+/* ============================================================
    verification
    ============================================================ */
 function setProbe(cls,html){
@@ -2222,7 +2368,8 @@ function persist(){
     p:[paramFor(0),paramFor(1),paramFor(2),paramFor(3)],
     f0:$("i-f0").value, f1:$("i-f1").value, fs:$("i-fs").value,
     fps:S.fps, dwell:S.dwell, panels:S.panels,
-    size:$("i-size").value, lat:$("i-lat").value
+    size:$("i-size").value, lat:$("i-lat").value,
+    showMissing:S.showMissing
   }));
 }
 function restore(){
@@ -2256,6 +2403,7 @@ function restore(){
   if(c.dwell !== undefined){ S.dwell = c.dwell; $("i-dwell").value = String(c.dwell); }
   if(c.size !== undefined){ $("i-size").value = c.size; }
   if(c.lat){ $("i-lat").value = c.lat; }
+  if(c.showMissing){ S.showMissing = true; $("i-showmissing").checked = true; }
   if(c.panels){ setPanels(c.panels, true); }
 }
 
@@ -2292,8 +2440,9 @@ function initInner(){
   writeHash();
 
   $("b-play").addEventListener("click", toggle);
-  $("b-next").addEventListener("click", function(){ stop(); show(S.idx+1); });
-  $("b-prev").addEventListener("click", function(){ stop(); show(S.idx-1); });
+  $("b-step-fwd").addEventListener("click", function(){ stop(); show(S.idx+1); });
+  $("b-step-back").addEventListener("click", function(){ stop(); show(S.idx-1); });
+  $("b-now").addEventListener("click", goNow);
   $("b-first").addEventListener("click", function(){ stop(); show(0); });
   $("b-last").addEventListener("click", function(){ stop(); show(S.fhList.length-1); });
   $("b-load").addEventListener("click", function(){ persist(); writeHash(); loadAll(); });
@@ -2327,6 +2476,10 @@ function initInner(){
   $("b-spanfull").addEventListener("click", function(){ setSpan("full"); });
   $("b-home").addEventListener("click", goHome);
   $("b-wallout").addEventListener("click", function(){ setWall(false); });
+  $("i-showmissing").addEventListener("change", function(){
+    S.showMissing = this.checked;
+    persist(); writeHash(); rebuildStrip();
+  });
   $("b-gear").addEventListener("click", function(){
     var d = $("drawer");
     d.open = !d.open;
@@ -2382,6 +2535,7 @@ function initInner(){
     else if(k === "c" || k === "C"){ setCompare(!S.compare); }
     else if(k === "f" || k === "F"){ toggleFlicker(); }
     else if(k === "r" || k === "R"){ detectLatest(); }
+    else if(k === "n" || k === "N"){ goNow(); }
     else if(k === "w" || k === "W"){ setWall(!S.wall); }
     else if(k === "Escape"){ escapeOne(); }
     else if(k === "1"){ setPanels(1); }
