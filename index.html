@@ -103,6 +103,8 @@ body{
   position:absolute;inset:0;margin:auto;
   max-width:100%;max-height:100%;
   opacity:0;visibility:hidden;
+  transform:scale(var(--zscale,1));
+  transform-origin:var(--zx,50%) var(--zy,50%);
 }
 .pane-imgs img.on{opacity:1;visibility:visible}
 .pane-empty{
@@ -413,6 +415,7 @@ button,select,input[type=text]{font-family:var(--mono);font-size:12px}
     <div class="tabs" id="sit"></div>
     <div class="topright">
       <select class="sel" id="i-modelsel" aria-label="Model"></select>
+      <select class="sel" id="i-region" aria-label="Region" title="Crop-zoom into a region"></select>
     </div>
   </header>
 
@@ -658,7 +661,7 @@ var CFG_VERSION = 9;
 
 /* Shown in the header. If this is not the number quoted in chat, the browser or
    the Pages CDN is serving a cached copy - hard reload, or add ?v=N to the URL. */
-var BUILD = "24";
+var BUILD = "25";
 
 var BUILTIN_PRESETS = [
   { name:"NCEP MAG - HRRR CONUS", tpl:DEFAULT_TPL, model:"hrrr", area:"conus",
@@ -685,7 +688,7 @@ var S = {
   gen:0,
   watch:false, watchTimer:null, wall:false, migrated:false, booted:false,
   span:null, situation:null, zoom:null, sitParams:null,
-  showMissing:false, stale:false, staleTimer:null,
+  showMissing:false, stale:false, staleTimer:null, region:"conus",
   _dragging:false, _dragMoved:false, _dragStartX:0,
   profile:"hrrr", profileKind:"hourly"
 };
@@ -1451,6 +1454,7 @@ function buildStage(){
   }
   syncPanelFields();
   applyZoom();
+  if(typeof applyRegion === "function"){ applyRegion(S.region || "conus"); }
 }
 
 function syncPanelFields(){
@@ -2363,6 +2367,58 @@ function startStaleWatch(){
 }
 
 /* ============================================================
+   region crop-zoom
+
+   The CONUS image is magnified and shifted with a CSS transform so a region
+   fills the panel. Same pixels, no new detail, but a chosen area reads much
+   larger. Focal points are fractions of the CONUS image (x% across, y% down),
+   approximated from the lon/lat grid - close enough to frame a region.
+   ============================================================ */
+var REGIONS = [
+  ["conus",    "CONUS (full)",       50, 50, 1.0],
+  ["se",       "Southeast / ATL",    69, 58, 2.3],
+  ["fl",       "Florida",            76, 78, 3.0],
+  ["ne",       "Northeast",          85, 33, 2.5],
+  ["midatl",   "Mid-Atlantic",       82, 45, 2.6],
+  ["scentral", "South Central / TX", 47, 66, 2.2],
+  ["midwest",  "Midwest / Lakes",    62, 27, 2.2],
+  ["west",     "West Coast",         12, 46, 2.2],
+  ["plains",   "Northern Plains",    47, 22, 2.2]
+];
+
+function regionByKey(k){
+  for(var i=0;i<REGIONS.length;i++){ if(REGIONS[i][0] === k){ return REGIONS[i]; } }
+  return REGIONS[0];
+}
+
+function fillRegionSelect(){
+  var sel = $("i-region");
+  if(!sel){ return; }
+  sel.innerHTML = "";
+  for(var i=0;i<REGIONS.length;i++){
+    var o = el("option");
+    o.value = REGIONS[i][0];
+    o.textContent = REGIONS[i][1];
+    sel.appendChild(o);
+  }
+  sel.value = S.region || "conus";
+}
+
+function applyRegion(k){
+  S.region = k;
+  var r = regionByKey(k);
+  var st = $("stage");
+  if(st){
+    st.style.setProperty("--zscale", String(r[4]));
+    st.style.setProperty("--zx", r[2] + "%");
+    st.style.setProperty("--zy", r[3] + "%");
+  }
+  var sel = $("i-region");
+  if(sel && sel.value !== k){ sel.value = k; }
+  persist();
+}
+
+/* ============================================================
    verification
    ============================================================ */
 function setProbe(cls,html){
@@ -2548,7 +2604,7 @@ function persist(){
     f0:$("i-f0").value, f1:$("i-f1").value, fs:$("i-fs").value,
     fps:S.fps, dwell:S.dwell, panels:S.panels,
     size:$("i-size").value, lat:$("i-lat").value,
-    showMissing:S.showMissing, profile:S.profile
+    showMissing:S.showMissing, profile:S.profile, region:S.region
   }));
 }
 function restore(){
@@ -2584,6 +2640,7 @@ function restore(){
   if(c.lat){ $("i-lat").value = c.lat; }
   if(c.showMissing){ S.showMissing = true; $("i-showmissing").checked = true; }
   if(c.profile){ S.profile = c.profile; S.profileKind = profileById(c.profile).kind; }
+  if(c.region){ S.region = c.region; }
   if(c.panels){ setPanels(c.panels, true); }
 }
 
@@ -2609,6 +2666,7 @@ function initInner(){
   readHash();
   if(S.profile){ $("i-model").value = profileById(S.profile).model; }
   fillModelSelect();
+  fillRegionSelect();
   fillAreaSelect();
   showVerified();
   buildProductGrid();
@@ -2639,6 +2697,7 @@ function initInner(){
   $("b-wall").addEventListener("click", function(){ setWall(!S.wall); });
   $("b-link").addEventListener("click", copyLink);
   $("i-modelsel").addEventListener("change", function(){ applyProfile(this.value, false); });
+  $("i-region").addEventListener("change", function(){ applyRegion(this.value); });
   $("i-modelsel").addEventListener("pointerdown", function(){ fillModelSelect(); });
   $("i-areasel").addEventListener("change", function(){
     $("i-area").value = this.value;
@@ -2733,6 +2792,8 @@ function initInner(){
   markRate();
   applyZoom();
   var firstVisit = !store.get("hrrrloop.cfg");
+  fillRegionSelect();
+  applyRegion(S.region || "conus");
   startStaleWatch();
   S.booted = true;
   if(needDefaults){ applyModel(currentModel().id, false); }
