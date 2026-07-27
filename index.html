@@ -75,12 +75,12 @@ body{
 .app.radar-mode #b-radar{background:var(--cyan);border-color:var(--cyan);color:var(--ink)}
 .app.radar-mode .pane{background:#0d1b2a}
 .radar-base{position:absolute;inset:0;margin:auto;max-width:100%;max-height:100%;
-  z-index:1;
+  z-index:1;opacity:1 !important;visibility:visible !important;
   transform:scale(var(--zscale,1));transform-origin:var(--zx,50%) var(--zy,50%)}
 .radar-frame{position:absolute;inset:0;margin:auto;max-width:100%;max-height:100%;
   z-index:2;opacity:0;visibility:hidden;
   transform:scale(var(--zscale,1));transform-origin:var(--zx,50%) var(--zy,50%)}
-.radar-frame.on{opacity:1;visibility:visible}
+.radar-frame.on{opacity:1 !important;visibility:visible !important}
 .radarband{
   position:absolute;top:0;left:0;right:0;z-index:20;
   background:var(--cyan);color:var(--ink);text-align:center;
@@ -683,7 +683,7 @@ var CFG_VERSION = 9;
 
 /* Shown in the header. If this is not the number quoted in chat, the browser or
    the Pages CDN is serving a cached copy - hard reload, or add ?v=N to the URL. */
-var BUILD = "28";
+var BUILD = "29";
 
 var BUILTIN_PRESETS = [
   { name:"NCEP MAG - HRRR CONUS", tpl:DEFAULT_TPL, model:"hrrr", area:"conus",
