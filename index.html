@@ -68,6 +68,24 @@ body{
 .stage.p4{grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr}
 .stage.zoom{grid-template-columns:1fr !important;grid-template-rows:1fr !important}
 .app.stale-run .stage{outline:3px solid var(--red);outline-offset:-3px}
+.app.radar-mode .tabs,
+.app.radar-mode #i-modelsel,
+.app.radar-mode #panelseg,
+.app.radar-mode #b-cmp{display:none}
+.app.radar-mode #b-radar{background:var(--cyan);border-color:var(--cyan);color:var(--ink)}
+.radar-base{position:absolute;inset:0;margin:auto;max-width:100%;max-height:100%;
+  transform:scale(var(--zscale,1));transform-origin:var(--zx,50%) var(--zy,50%)}
+.radar-frame{position:absolute;inset:0;margin:auto;max-width:100%;max-height:100%;
+  opacity:0;visibility:hidden;
+  transform:scale(var(--zscale,1));transform-origin:var(--zx,50%) var(--zy,50%)}
+.radar-frame.on{opacity:1;visibility:visible}
+.radarband{
+  position:absolute;top:0;left:0;right:0;z-index:20;
+  background:var(--cyan);color:var(--ink);text-align:center;
+  font-family:var(--mono);font-size:12px;letter-spacing:.1em;
+  padding:4px 8px;pointer-events:none;
+}
+.app:not(.radar-mode) .radarband{display:none}
 .staleband{
   position:absolute;top:0;left:0;right:0;z-index:20;
   background:var(--red);color:#fff;text-align:center;
@@ -434,6 +452,7 @@ button,select,input[type=text]{font-family:var(--mono);font-size:12px}
 
   <div class="stagewrap">
     <div class="staleband" id="s-staleband" hidden>OLD DATA &mdash; THIS RUN IS OUT OF DATE, CHECK THE CYCLE BEFORE BRIEFING</div>
+    <div class="radarband">LIVE RADAR &mdash; OBSERVED, LAST 4 HOURS (NOT A FORECAST)</div>
     <main class="stage p1" id="stage"></main>
   </div>
 
@@ -473,6 +492,7 @@ button,select,input[type=text]{font-family:var(--mono);font-size:12px}
     <div class="spacer"></div>
 
     <div class="seg">
+      <button class="btn ghost" id="b-radar" title="Live observed radar (MRMS)">LIVE RADAR</button>
       <button class="btn ghost" id="b-wall" title="Full-screen zoom (W)">ZOOM</button>
       <button class="btn ghost" id="b-gear" title="Settings and diagnostics">SETTINGS</button>
     </div>
@@ -661,7 +681,7 @@ var CFG_VERSION = 9;
 
 /* Shown in the header. If this is not the number quoted in chat, the browser or
    the Pages CDN is serving a cached copy - hard reload, or add ?v=N to the URL. */
-var BUILD = "25";
+var BUILD = "26";
 
 var BUILTIN_PRESETS = [
   { name:"NCEP MAG - HRRR CONUS", tpl:DEFAULT_TPL, model:"hrrr", area:"conus",
@@ -688,6 +708,7 @@ var S = {
   gen:0,
   watch:false, watchTimer:null, wall:false, migrated:false, booted:false,
   span:null, situation:null, zoom:null, sitParams:null,
+  radar:false, radarTimes:null,
   showMissing:false, stale:false, staleTimer:null, region:"conus",
   _dragging:false, _dragMoved:false, _dragStartX:0,
   profile:"hrrr", profileKind:"hourly"
@@ -1588,6 +1609,7 @@ function markCell(fh,st){
 function currentWhich(){ return S.compare ? "prev" : "cur"; }
 
 function show(i){
+  if(S.radar){ return radarShow(i); }
   if(!S.fhList.length){ return; }
   if(i < 0){ i = S.fhList.length - 1; }
   if(i >= S.fhList.length){ i = 0; }
@@ -2220,6 +2242,7 @@ function showLoading(){
    home - back to the default view without wiping saved settings
    ============================================================ */
 function goHome(){
+  if(S.radar){ exitRadar(); }
   S.zoom = null;
   if(S.wall){ setWall(false); }
   if(S.flicker){ toggleFlicker(); }
@@ -2285,6 +2308,7 @@ function buildSubtabs(){
    NOW - move the time cursor to the frame nearest the clock
    ============================================================ */
 function goNow(){
+  if(S.radar){ return radarNow(); }
   if(!S.cycle || !S.fhList.length){ return; }
   stop();
   var now = Date.now();
@@ -2416,6 +2440,205 @@ function applyRegion(k){
   var sel = $("i-region");
   if(sel && sel.value !== k){ sel.value = k; }
   persist();
+}
+
+/* ============================================================
+   LIVE RADAR mode  (observed, not forecast)
+
+   MRMS 1 km base reflectivity from NOAA's time-enabled ImageServer, exported as
+   a transparent PNG per timestamp, stacked over a static NWS reference basemap.
+   Both come from mapservices.weather.noaa.gov - the host confirmed reachable.
+   The loop is the last 4 hours in 5-minute steps, newest last. Self-contained:
+   the forecast code is untouched; shared transport dispatches here when S.radar.
+   ============================================================ */
+var RADAR_BASE_URL =
+  "https://mapservices.weather.noaa.gov/static/rest/services/nws_reference_maps/nws_reference_map/MapServer/export";
+var RADAR_IMG_URL =
+  "https://mapservices.weather.noaa.gov/eventdriven/rest/services/radar/radar_base_reflectivity_time/ImageServer/exportImage";
+
+/* CONUS-ish extent in Web Mercator (3857); ratio ~1.72 */
+var RADAR_BBOX = [-14200000, 2600000, -7500000, 6500000];
+var RADAR_W = 1200, RADAR_H = 700;
+var RADAR_STEP_MIN = 5;
+var RADAR_SPAN_MIN = 240;   /* last 4 hours */
+
+function radarBaseUrl(){
+  var q = [
+    "bbox=" + RADAR_BBOX.join(","),
+    "bboxSR=3857","imageSR=3857",
+    "size=" + RADAR_W + "," + RADAR_H,
+    "format=png24","transparent=false","f=image"
+  ];
+  return RADAR_BASE_URL + "?" + q.join("&");
+}
+function radarImgUrl(epochMs){
+  var q = [
+    "bbox=" + RADAR_BBOX.join(","),
+    "bboxSR=3857","imageSR=3857",
+    "size=" + RADAR_W + "," + RADAR_H,
+    "format=png32","transparent=true","f=image",
+    "time=" + epochMs
+  ];
+  return RADAR_IMG_URL + "?" + q.join("&");
+}
+
+function radarBuildTimes(){
+  /* align "now" down to the step so timestamps are clean */
+  var stepMs = RADAR_STEP_MIN * 60000;
+  var end = Math.floor(Date.now() / stepMs) * stepMs;
+  var start = end - RADAR_SPAN_MIN * 60000;
+  var out = [];
+  for(var t = start; t <= end; t += stepMs){ out.push(t); }
+  return out;
+}
+
+function enterRadar(){
+  S.radar = true;
+  stop();
+  var app = $("app");
+  if(app){ app.className = app.className.replace(/\s*radar-mode/g,"") + " radar-mode"; }
+  var b = $("b-radar");
+  if(b){ b.className = "btn ghost on"; b.textContent = "LIVE RADAR"; }
+  setStale(false, 0);
+  $("s-flag").hidden = true;
+  radarLoad();
+}
+
+function exitRadar(){
+  S.radar = false;
+  stop();
+  var app = $("app");
+  if(app){ app.className = app.className.replace(/\s*radar-mode/g,""); }
+  var b = $("b-radar");
+  if(b){ b.className = "btn ghost"; b.textContent = "LIVE RADAR"; }
+  loadAll();            /* back to the forecast loop */
+  startStaleWatch();
+}
+
+function radarLoad(){
+  S.gen++;
+  var gen = S.gen;
+  S.radarTimes = radarBuildTimes();
+  S.fhList = [];
+  for(var i=0;i<S.radarTimes.length;i++){ S.fhList.push(i); }   /* index list for shared bounds */
+  S.idx = S.fhList.length - 1;    /* start on the newest frame */
+  S.frames = {};
+  S.loadedCount = 0; S.missingCount = 0;
+
+  /* single pane for radar */
+  var savedPanels = S.panels;
+  S.panels = 1;
+  buildStage();
+  S.panels = savedPanels;
+
+  var pane = document.querySelector('.pane[data-p="0"]');
+  var holder = pane ? pane.querySelector(".pane-imgs") : null;
+  var tag = pane ? pane.querySelector(".pane-tag") : null;
+  if(tag){ tag.innerHTML = "<b>Live radar - base reflectivity</b><span>MRMS 1 km - observed</span>"; }
+
+  /* static basemap behind everything */
+  if(holder){
+    var base = new Image();
+    base.className = "radar-base";
+    base.alt = "";
+    base.src = radarBaseUrl();
+    holder.appendChild(base);
+  }
+
+  /* radar frames, oldest first, stacked on top */
+  for(var f=0; f<S.radarTimes.length; f++){
+    (function(f){
+      var img = new Image();
+      img.alt = "";
+      img.className = "radar-frame";
+      img.setAttribute("data-ri", String(f));
+      img.onload = function(){
+        if(gen !== S.gen){ return; }
+        S.loadedCount++; markCell(f,"ok"); showLoading();
+        if(f === S.idx){ radarShow(S.idx); }
+      };
+      img.onerror = function(){
+        if(gen !== S.gen){ return; }
+        S.missingCount++; markCell(f,"missing"); showLoading();
+      };
+      if(holder){ holder.appendChild(img); }
+      img.src = radarImgUrl(S.radarTimes[f]);
+    })(f);
+  }
+
+  radarBuildStrip();
+  if(typeof applyRegion === "function"){ applyRegion(S.region || "conus"); }
+  radarShow(S.idx);
+}
+
+function radarBuildStrip(){
+  var bay = $("bay");
+  if(!bay){ return; }
+  bay.innerHTML = "";
+  for(var i=0;i<S.radarTimes.length;i++){
+    (function(i){
+      var d = new Date(S.radarTimes[i]);
+      var c = el("button","cell");
+      c.setAttribute("data-i", String(i));
+      var a = el("div","cell-fh"); a.textContent = zShort(d);           /* HHZ */
+      var b = el("div","cell-z");  b.textContent = pad(d.getUTCMinutes(),2) + "m";
+      var s = el("div","cell-state");
+      c.title = zLabel(d) + "  " + etLabel(d);
+      if(Math.abs(d.getTime() - Date.now()) < 3*60000){ c.className += " now"; }
+      c.appendChild(a); c.appendChild(b); c.appendChild(s);
+      c.addEventListener("click", function(){ if(S._dragMoved){ return; } stop(); radarShow(i); });
+      bay.appendChild(c);
+    })(i);
+  }
+}
+
+function radarShow(i){
+  if(!S.radarTimes || !S.radarTimes.length){ return; }
+  if(i < 0){ i = S.radarTimes.length - 1; }
+  if(i >= S.radarTimes.length){ i = 0; }
+  S.idx = i;
+
+  var pane = document.querySelector('.pane[data-p="0"]');
+  if(pane){
+    var frames = pane.querySelectorAll(".radar-frame");
+    var found = false;
+    for(var k=0;k<frames.length;k++){
+      var on = (parseInt(frames[k].getAttribute("data-ri"),10) === i);
+      frames[k].className = "radar-frame" + (on ? " on" : "");
+      if(on){ found = true; }
+    }
+    var em = $("empty-0");
+    if(em){
+      var loaded = frames.length && found;
+      em.style.display = "none";   /* radar shows base even if a frame is missing */
+    }
+  }
+
+  /* strip cursor */
+  var cells = $("bay").querySelectorAll(".cell");
+  for(var q=0;q<cells.length;q++){
+    var cl = cells[q].className.replace(/\bhere\b/g,"").replace(/\s+/g," ").trim();
+    if(parseInt(cells[q].getAttribute("data-i"),10) === i){
+      cl += " here";
+      var bay = $("bay"), cc = cells[q];
+      if(cc.offsetLeft < bay.scrollLeft ||
+         cc.offsetLeft + cc.offsetWidth > bay.scrollLeft + bay.clientWidth){
+        bay.scrollLeft = cc.offsetLeft - bay.clientWidth/2 + cc.offsetWidth/2;
+      }
+    }
+    cells[q].className = cl;
+  }
+
+  var d = new Date(S.radarTimes[i]);
+  setStatus("s-validline", longValid(d));
+  setStatus("s-frames", S.loadedCount + " / " + S.radarTimes.length);
+  showLoading();
+}
+
+function radarNow(){
+  if(!S.radarTimes || !S.radarTimes.length){ return; }
+  stop();
+  radarShow(S.radarTimes.length - 1);
 }
 
 /* ============================================================
@@ -2695,6 +2918,7 @@ function initInner(){
   $("b-del").addEventListener("click", deletePreset);
   $("b-watch").addEventListener("click", function(){ setWatch(!S.watch); });
   $("b-wall").addEventListener("click", function(){ setWall(!S.wall); });
+  $("b-radar").addEventListener("click", function(){ if(S.radar){ exitRadar(); } else { enterRadar(); } });
   $("b-link").addEventListener("click", copyLink);
   $("i-modelsel").addEventListener("change", function(){ applyProfile(this.value, false); });
   $("i-region").addEventListener("change", function(){ applyRegion(this.value); });
