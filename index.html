@@ -107,7 +107,9 @@ body{
   flex:0 0 auto;background:var(--panel);
   border-top:1px solid var(--rule);border-bottom:1px solid var(--rule);
 }
-.bay-scroll{display:flex;overflow-x:auto;overflow-y:hidden}
+.bay-scroll{display:flex;overflow-x:auto;overflow-y:hidden;cursor:ew-resize;user-select:none}
+.bay-scroll.dragging{cursor:grabbing}
+.bay-scroll.dragging .cell{pointer-events:none}
 .cell{
   flex:0 0 auto;min-width:52px;
   padding:7px 6px 0;border-right:1px solid var(--rule);
@@ -312,6 +314,7 @@ button,select,input[type=text]{font-family:var(--mono);font-size:12px}
 .seg .btn:first-child{border-radius:2px 0 0 2px}
 .seg .btn:last-child{border-radius:0 2px 2px 0;border-right-width:1px}
 .btn.play{min-width:74px}
+.seg.step .btn{font-size:15px;padding:6px 13px}
 .statrow{
   display:flex;flex-wrap:wrap;gap:18px;font-family:var(--mono);
   font-size:11px;color:var(--dim);
@@ -377,7 +380,6 @@ button,select,input[type=text]{font-family:var(--mono);font-size:12px}
     <div class="tabs" id="sit"></div>
     <div class="topright">
       <select class="sel" id="i-modelsel" aria-label="Model"></select>
-      <span class="coverage" id="s-coverage">&mdash;</span>
     </div>
   </header>
 
@@ -411,12 +413,16 @@ button,select,input[type=text]{font-family:var(--mono);font-size:12px}
   <div class="deck">
     <div class="cluster">
       <span class="cl-k">Time</span>
+      <div class="seg step" title="Step back / forward in time (J / K)">
+        <button class="btn" id="b-step-back" aria-label="Step back">&#x25C0;</button>
+        <button class="btn" id="b-step-fwd" aria-label="Step forward">&#x25B6;</button>
+      </div>
       <div class="seg">
-        <button class="btn" id="b-first" title="First frame (Home)">&#x23EE;</button>
-        <button class="btn" id="b-step-back" title="Step back (J / left)">&#x25C0;</button>
+        <button class="btn" id="b-first" title="First frame">&#x23EE;</button>
+        <button class="btn" id="b-last" title="Last frame">&#x23ED;</button>
+      </div>
+      <div class="seg">
         <button class="btn wide play" id="b-play" title="Play / pause (space)">PLAY</button>
-        <button class="btn" id="b-step-fwd" title="Step forward (K / right)">&#x25B6;</button>
-        <button class="btn" id="b-last" title="Last frame (End)">&#x23ED;</button>
         <button class="btn" id="b-now" title="Jump to the frame nearest now (N)">NOW</button>
       </div>
       <span class="loadnote" id="s-load" hidden></span>
@@ -645,11 +651,11 @@ var DEFAULT_LATENCY_MIN = 120;
 /* Bumped whenever the shipped template changes. Saved settings and shared links
    carry this stamp; anything older has its template discarded rather than
    allowed to override a fix. Everything else the user chose is kept. */
-var CFG_VERSION = 8;
+var CFG_VERSION = 9;
 
 /* Shown in the header. If this is not the number quoted in chat, the browser or
    the Pages CDN is serving a cached copy - hard reload, or add ?v=N to the URL. */
-var BUILD = "15";
+var BUILD = "17";
 
 var BUILTIN_PRESETS = [
   { name:"NCEP MAG - HRRR CONUS", tpl:DEFAULT_TPL, model:"hrrr", area:"conus",
@@ -676,7 +682,9 @@ var S = {
   gen:0,
   watch:false, watchTimer:null, wall:false, migrated:false, booted:false,
   span:null, situation:null, zoom:null, sitParams:null,
-  showMissing:false
+  showMissing:false,
+  _dragging:false, _dragMoved:false, _dragStartX:0,
+  profile:"hrrr", profileKind:"hourly"
 };
 
 function $(id){ return document.getElementById(id); }
@@ -793,8 +801,8 @@ function newestPlausibleCycle(){
   var t = Date.now() - latencyMin()*60000;
   var d = new Date(t);
   var h = d.getUTCHours();
-  var step = currentModel().cyc || 1;
-  h = Math.floor(h/step)*step;          /* GFS only runs 00/06/12/18 */
+  var step = cycleStepH();
+  h = Math.floor(h/step)*step;
   return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), h));
 }
 
@@ -814,7 +822,7 @@ function detectLatest(){
       $("drawer").open = true;
       return;
     }
-    var t = new Date(c.getTime() - back*(currentModel().cyc||1)*3600000);
+    var t = new Date(c.getTime() - back*cycleStepH()*3600000);
     probeImage(buildUrl(PROBE_FH, PROBE_PARAM, t), function(good){
       if(good){ useCycle(t); verifyAge(t); }
       else { back++; setStatus("s-runsub","checking -"+back+"h"); step(); }
@@ -856,8 +864,9 @@ function verifyAge(cycle){
 
 function useCycle(c){
   S.cycle = c;
-  S.prevCycle = new Date(c.getTime() - (currentModel().cyc||1)*3600000);
+  S.prevCycle = new Date(c.getTime() - cycleStepH()*3600000);
   fillCycleSelect();
+  if($("i-modelsel")){ fillModelSelect(); }
   var age = Math.round((Date.now() - c.getTime())/60000);
   setStatus("s-runsub", "cycle +" + age + " min");
   clampRange();
@@ -866,7 +875,7 @@ function useCycle(c){
 
 function useCycleQuiet(c){
   S.cycle = c;
-  S.prevCycle = new Date(c.getTime() - (currentModel().cyc||1)*3600000);
+  S.prevCycle = new Date(c.getTime() - cycleStepH()*3600000);
   fillCycleSelect();
   setStatus("s-runsub","from pasted URL");
 }
@@ -875,7 +884,7 @@ function fillCycleSelect(){
   var sel = $("i-cycle");
   sel.innerHTML = "";
   if(!S.cycle){ return; }
-  var iv = (currentModel().cyc || 1);
+  var iv = cycleStepH();
   for(var i=0;i<24;i++){
     var c = new Date(S.cycle.getTime() - i*iv*3600000);
     var o = el("option");
@@ -1037,6 +1046,15 @@ var MODELS = [
 ];
 
 /* Human coverage summary derived from the registry so it stays in sync. */
+/* Compact version for the dropdown line. */
+function coverageShort(m){
+  var cad = (m.cyc === 1) ? "hourly" : ("every " + m.cyc + "h");
+  var base = "out to " + m.maxFH + "h";
+  if(m.extMaxFH && m.extMaxFH > m.maxFH){ base += " (" + m.extMaxFH + "h at 00/06/12/18Z)"; }
+  else if(m.maxFH >= 48 && m.maxFH % 24 === 0){ base += " / " + (m.maxFH/24) + "d"; }
+  return cad + ", " + base;
+}
+
 function coverageText(m){
   function span(h){
     if(h <= 0){ return "analysis only"; }
@@ -1057,6 +1075,67 @@ function coverageText(m){
 function modelById(id){
   for(var i=0;i<MODELS.length;i++){ if(MODELS[i].id === id){ return MODELS[i]; } }
   return MODELS[0];
+}
+
+/* A profile is one selectable dropdown line: a model plus which run family to
+   track. "hourly" follows the latest run of any hour; "extended" follows the
+   latest 00/06/12/18Z run, which is the only family that forecasts far out. */
+var PROFILES = [
+  { id:"hrrr",     model:"hrrr", kind:"hourly"   },
+  { id:"hrrr-ext", model:"hrrr", kind:"extended" },
+  { id:"rap",      model:"rap",  kind:"hourly"   },
+  { id:"rap-ext",  model:"rap",  kind:"extended" },
+  { id:"gfs",      model:"gfs",  kind:"single"   }
+];
+
+function profileById(id){
+  for(var i=0;i<PROFILES.length;i++){ if(PROFILES[i].id === id){ return PROFILES[i]; } }
+  /* accept a bare model id too, mapping to its hourly/single profile */
+  for(var j=0;j<PROFILES.length;j++){
+    if(PROFILES[j].model === id && PROFILES[j].kind !== "extended"){ return PROFILES[j]; }
+  }
+  return PROFILES[0];
+}
+function currentProfile(){ return profileById(S.profile || "hrrr"); }
+
+/* Effective cadence and range for the active profile. */
+function cycleStepH(){
+  var m = currentModel();
+  return (S.profileKind === "extended") ? (m.extEvery || 6) : (m.cyc || 1);
+}
+function profileMaxFH(){
+  var m = currentModel();
+  return (S.profileKind === "extended" && m.extMaxFH) ? m.extMaxFH : m.maxFH;
+}
+
+/* Dropdown line: what it is, how far out, and the run it is tracking right now. */
+function profileLabel(pr){
+  var m = modelById(pr.model);
+  var kind = (pr.kind === "extended") ? m.extMaxFH : m.maxFH;
+  var days = (kind >= 48 && kind % 24 === 0) ? (" / " + (kind/24) + "d") : "";
+  var reach = "out to " + kind + "h" + days;
+  var which, cyc;
+  if(pr.kind === "hourly"){
+    which = "latest hourly run"; cyc = expectedCycle(pr);
+  } else if(pr.kind === "extended"){
+    which = "latest 00/06/12/18Z run"; cyc = expectedCycle(pr);
+  } else {
+    which = "every " + (m.cyc||6) + "h"; cyc = expectedCycle(pr);
+  }
+  var when = cyc ? ("  ~" + pad(cyc.getUTCHours(),2) + "Z") : "";
+  return m.label + " - " + reach + " - " + which + when;
+}
+
+/* Newest plausible cycle for a given profile, from the clock. */
+function applyModel(id, keepParams){ applyProfile(id, keepParams); }
+
+function expectedCycle(pr){
+  var m = modelById(pr.model);
+  var step = (pr.kind === "extended") ? (m.extEvery || 6) : (m.cyc || 1);
+  var t = Date.now() - latencyMin()*60000;
+  var d = new Date(t);
+  var h = Math.floor(d.getUTCHours()/step)*step;
+  return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), h));
 }
 function currentModel(){
   return modelById(($("i-model") ? $("i-model").value.trim() : "hrrr") || "hrrr");
@@ -1156,14 +1235,15 @@ function learnTpl(id,tpl){
    ============================================================ */
 function fillModelSelect(){
   var sel = $("i-modelsel");
+  var keep = sel.value;
   sel.innerHTML = "";
-  for(var i=0;i<MODELS.length;i++){
+  for(var i=0;i<PROFILES.length;i++){
     var o = el("option");
-    o.value = MODELS[i].id;
-    o.textContent = MODELS[i].label + (MODELS[i].verified ? "" : "  (unconfirmed)");
+    o.value = PROFILES[i].id;
+    o.textContent = profileLabel(PROFILES[i]);
     sel.appendChild(o);
   }
-  sel.value = currentModel().id;
+  sel.value = (S.profile || keep || "hrrr");
 }
 
 function fillAreaSelect(){
@@ -1186,11 +1266,6 @@ function fillAreaSelect(){
   }
 }
 
-function showCoverage(){
-  var n = $("s-coverage");
-  if(n){ n.textContent = coverageText(currentModel()); }
-}
-
 function showVerified(){
   var m = currentModel();
   var n = $("s-verified");
@@ -1201,9 +1276,12 @@ function showVerified(){
     : "path not confirmed - use READ BACK if frames fail";
 }
 
-/* Switching model resets everything that is model-specific. */
-function applyModel(id, keepParams){
-  var m = modelById(id);
+/* Switching profile resets everything model- and run-family-specific. */
+function applyProfile(profileId, keepParams){
+  var pr = profileById(profileId);
+  S.profile = pr.id;
+  S.profileKind = pr.kind;
+  var m = modelById(pr.model);
   $("i-model").value = m.id;
   if(!keepParams || m.areas.indexOf($("i-area").value.trim()) === -1){
     $("i-area").value = m.areas[0];
@@ -1212,7 +1290,6 @@ function applyModel(id, keepParams){
 
   fillAreaSelect();
   showVerified();
-  showCoverage();
   buildProductGrid();
   buildSituations();
 
@@ -1228,7 +1305,7 @@ function applyModel(id, keepParams){
   for(var k=0;k<4;k++){ syncSelectFromText(k); }
 
   $("i-f0").value = "0";
-  $("i-f1").value = String(m.maxFH);
+  $("i-f1").value = String(profileMaxFH());
   $("i-fs").value = String(m.step);
   $("b-sub").disabled = !m.sub;
   S.span = "full";
@@ -1325,7 +1402,7 @@ function wantKeyFor(p){
   if(!S.fhList.length){ return ""; }
   var fh = S.fhList[S.idx];
   var which = currentWhich();
-  return frameKey(p, which === "prev" ? fh+(currentModel().cyc||1) : fh, which);
+  return frameKey(p, which === "prev" ? fh+cycleStepH() : fh, which);
 }
 
 function loadCompareSet(){
@@ -1333,7 +1410,7 @@ function loadCompareSet(){
   for(var p=0;p<S.panels;p++){
     for(var i=0;i<S.fhList.length;i++){
       /* one cycle earlier at the same valid time means one forecast hour further out */
-      queueFrame(p, S.fhList[i]+(currentModel().cyc||1), "prev", S.prevCycle);
+      queueFrame(p, S.fhList[i]+cycleStepH(), "prev", S.prevCycle);
     }
   }
 }
@@ -1433,11 +1510,62 @@ function buildBay(){
     var s = el("div","cell-state");
     c.appendChild(a); c.appendChild(b); c.appendChild(s);
     c.addEventListener("click", function(){
+      if(S._dragMoved){ return; }   /* a drag, not a click */
       stop();
       show(parseInt(this.getAttribute("data-i"),10));
     });
     bay.appendChild(c);
   }
+  wireStripDrag();
+}
+
+/* Drag anywhere across the strip to sweep through time. Pointer events cover
+   mouse and touch; the nearest cell under the pointer becomes the frame. */
+function wireStripDrag(){
+  var bay = $("bay");
+  if(!bay || bay._dragWired){ return; }
+  bay._dragWired = true;
+
+  function frameAt(clientX){
+    var cells = bay.querySelectorAll(".cell");
+    if(!cells.length){ return; }
+    var best = null, bestDist = Infinity;
+    for(var i=0;i<cells.length;i++){
+      var r = cells[i].getBoundingClientRect();
+      var mid = r.left + r.width/2;
+      var d = Math.abs(clientX - mid);
+      if(d < bestDist){ bestDist = d; best = cells[i]; }
+    }
+    if(best){
+      var idx = parseInt(best.getAttribute("data-i"),10);
+      if(idx !== S.idx){ show(idx); }
+    }
+  }
+
+  bay.addEventListener("pointerdown", function(e){
+    if(e.button !== undefined && e.button !== 0){ return; }
+    S._dragging = true;
+    S._dragMoved = false;
+    S._dragStartX = e.clientX;
+    stop();
+    bay.classList.add("dragging");
+    try { bay.setPointerCapture(e.pointerId); } catch(_){}
+  });
+  bay.addEventListener("pointermove", function(e){
+    if(!S._dragging){ return; }
+    if(Math.abs(e.clientX - S._dragStartX) > 3){ S._dragMoved = true; }
+    if(S._dragMoved){ frameAt(e.clientX); }
+  });
+  function endDrag(e){
+    if(!S._dragging){ return; }
+    S._dragging = false;
+    bay.classList.remove("dragging");
+    try { bay.releasePointerCapture(e.pointerId); } catch(_){}
+    /* let the click handler run once, then clear the flag */
+    setTimeout(function(){ S._dragMoved = false; }, 0);
+  }
+  bay.addEventListener("pointerup", endDrag);
+  bay.addEventListener("pointercancel", endDrag);
 }
 
 function markCell(fh,st){
@@ -1461,7 +1589,7 @@ function show(i){
     var pane = document.querySelector('.pane[data-p="'+p+'"]');
     if(!pane){ continue; }
     var imgs = pane.querySelectorAll(".pane-imgs img");
-    var want = frameKey(p, which === "prev" ? fh+(currentModel().cyc||1) : fh, which);
+    var want = frameKey(p, which === "prev" ? fh+cycleStepH() : fh, which);
     var found = false;
     for(var k=0;k<imgs.length;k++){
       var key = imgs[k].getAttribute("data-key");
@@ -1508,7 +1636,7 @@ function updateSlugs(){
   if(!S.cycle){ return; }
   var fh = S.fhList.length ? S.fhList[S.idx] : 0;
   var eff = S.compare ? S.prevCycle : S.cycle;
-  var effFh = S.compare ? fh + (currentModel().cyc||1) : fh;
+  var effFh = S.compare ? fh + cycleStepH() : fh;
   setStatus("s-run", cycleLabel(eff));
   setStatus("s-fh", fhLabel(effFh));
   var v = validDate(eff, effFh);
@@ -1699,7 +1827,7 @@ function setWatch(on){
 
 function checkForNewRun(){
   if(!S.cycle){ return; }
-  var next = new Date(S.cycle.getTime() + (currentModel().cyc||1)*3600000);
+  var next = new Date(S.cycle.getTime() + cycleStepH()*3600000);
   if(next.getTime() > Date.now()){ return; }
   probeImage(buildUrl(PROBE_FH, PROBE_PARAM, next), function(good){
     if(!good){ return; }
@@ -2372,7 +2500,7 @@ function persist(){
     f0:$("i-f0").value, f1:$("i-f1").value, fs:$("i-fs").value,
     fps:S.fps, dwell:S.dwell, panels:S.panels,
     size:$("i-size").value, lat:$("i-lat").value,
-    showMissing:S.showMissing
+    showMissing:S.showMissing, profile:S.profile
   }));
 }
 function restore(){
@@ -2407,6 +2535,7 @@ function restore(){
   if(c.size !== undefined){ $("i-size").value = c.size; }
   if(c.lat){ $("i-lat").value = c.lat; }
   if(c.showMissing){ S.showMissing = true; $("i-showmissing").checked = true; }
+  if(c.profile){ S.profile = c.profile; S.profileKind = profileById(c.profile).kind; }
   if(c.panels){ setPanels(c.panels, true); }
 }
 
@@ -2430,10 +2559,10 @@ function initInner(){
   fillPresets();
   restore();
   readHash();
+  if(S.profile){ $("i-model").value = profileById(S.profile).model; }
   fillModelSelect();
   fillAreaSelect();
   showVerified();
-  showCoverage();
   buildProductGrid();
   buildSituations();
   for(var s0=0;s0<4;s0++){ syncSelectFromText(s0); }
@@ -2462,7 +2591,8 @@ function initInner(){
   $("b-watch").addEventListener("click", function(){ setWatch(!S.watch); });
   $("b-wall").addEventListener("click", function(){ setWall(!S.wall); });
   $("b-link").addEventListener("click", copyLink);
-  $("i-modelsel").addEventListener("change", function(){ applyModel(this.value, false); });
+  $("i-modelsel").addEventListener("change", function(){ applyProfile(this.value, false); });
+  $("i-modelsel").addEventListener("pointerdown", function(){ fillModelSelect(); });
   $("i-areasel").addEventListener("change", function(){
     $("i-area").value = this.value;
     persist(); writeHash(); detectLatest();
