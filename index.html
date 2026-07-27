@@ -683,7 +683,7 @@ var CFG_VERSION = 9;
 
 /* Shown in the header. If this is not the number quoted in chat, the browser or
    the Pages CDN is serving a cached copy - hard reload, or add ?v=N to the URL. */
-var BUILD = "31";
+var BUILD = "32";
 
 var BUILTIN_PRESETS = [
   { name:"NCEP MAG - HRRR CONUS", tpl:DEFAULT_TPL, model:"hrrr", area:"conus",
@@ -710,7 +710,7 @@ var S = {
   gen:0,
   watch:false, watchTimer:null, wall:false, migrated:false, booted:false,
   span:null, situation:null, zoom:null, sitParams:null,
-  radar:false, radarTimes:null, radarImgs:null, radarStatus:null,
+  radar:false, radarTimes:null, radarImgs:null, radarStatus:null, radarCanCheck:false,
   showMissing:false, stale:false, staleTimer:null, region:"conus",
   _dragging:false, _dragMoved:false, _dragStartX:0,
   profile:"hrrr", profileKind:"hourly"
@@ -2520,7 +2520,57 @@ function exitRadar(){
   startStaleWatch();
 }
 
+/* Can we read pixels back from these images? Only if the server sends CORS
+   headers. Probe once; if it fails we simply skip empty-frame detection rather
+   than break the display. */
+function radarProbeCors(done){
+  var img = new Image();
+  var settled = false;
+  var t = setTimeout(function(){ if(!settled){ settled = true; done(false); } }, 4000);
+  img.crossOrigin = "anonymous";
+  img.onload = function(){
+    if(settled){ return; } settled = true; clearTimeout(t);
+    try {
+      var c = document.createElement("canvas");
+      c.width = 8; c.height = 8;
+      var g = c.getContext("2d");
+      g.drawImage(img, 0, 0, 8, 8);
+      g.getImageData(0, 0, 1, 1);   /* throws if tainted */
+      done(true);
+    } catch(e){ done(false); }
+  };
+  img.onerror = function(){ if(!settled){ settled = true; clearTimeout(t); done(false); } };
+  img.src = radarImgUrl(Date.now());
+}
+
+/* True if the frame is essentially empty (almost no coloured pixels). */
+function radarFrameEmpty(img){
+  try {
+    var W = 96, H = 56;
+    var c = document.createElement("canvas");
+    c.width = W; c.height = H;
+    var g = c.getContext("2d");
+    g.clearRect(0, 0, W, H);
+    g.drawImage(img, 0, 0, W, H);
+    var data = g.getImageData(0, 0, W, H).data;
+    var hits = 0;
+    for(var p = 3; p < data.length; p += 4){
+      if(data[p] > 24){ hits++; if(hits > 8){ return false; } }   /* alpha */
+    }
+    return true;
+  } catch(e){
+    return false;   /* can't tell -> keep the frame */
+  }
+}
+
 function radarLoad(){
+  radarProbeCors(function(ok){
+    S.radarCanCheck = ok;
+    radarLoadFrames();
+  });
+}
+
+function radarLoadFrames(){
   S.gen++;
   var gen = S.gen;
   S.radarTimes = radarBuildTimes();
@@ -2559,16 +2609,25 @@ function radarLoad(){
   for(var f=0; f<S.radarTimes.length; f++){
     (function(f){
       var img = new Image();
+      if(S.radarCanCheck){ img.crossOrigin = "anonymous"; }
       img.alt = "";
       img.className = "radar-frame";
       img.setAttribute("data-ri", String(f));
       img._tries = 0;
       img.onload = function(){
         if(gen !== S.gen){ return; }
+        if(S.radarCanCheck && radarFrameEmpty(img)){
+          /* valid PNG but no echoes - a "no image" frame. Drop it. */
+          S.radarStatus[f] = "missing";
+          S.missingCount++;
+          scheduleRadarRebuild();
+          showLoading();
+          return;
+        }
         if(!img._counted){ img._counted = true; S.loadedCount++; }
         S.radarStatus[f] = "ok";
         showLoading();
-        radarShow(S.idx);            /* refresh current view as frames arrive */
+        radarShow(S.idx);
       };
       img.onerror = function(){
         if(gen !== S.gen){ return; }
