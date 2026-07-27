@@ -232,7 +232,17 @@ button,select,input[type=text]{font-family:var(--mono);font-size:12px}
   display:flex;align-items:center;gap:12px;flex:0 0 auto;
   padding:0 12px;background:var(--panel2);border-bottom:1px solid var(--rule);
 }
-.tabs{display:flex;gap:0;overflow-x:auto;flex:1 1 auto}
+.tabs{
+  display:flex;gap:0;flex:1 1 auto;min-width:0;
+  overflow-x:auto;overflow-y:hidden;
+  scrollbar-width:thin;scrollbar-color:var(--rule) transparent;
+}
+.tabs::-webkit-scrollbar{height:5px}
+.tabs::-webkit-scrollbar-thumb{background:var(--rule);border-radius:3px}
+.tabs::-webkit-scrollbar-track{background:transparent}
+.top{min-width:0}
+.topright{flex:0 0 auto}
+.sel#i-modelsel{max-width:220px}
 .home{
   display:flex;flex-direction:column;gap:1px;align-items:flex-start;
   background:none;border:0;border-right:1px solid var(--rule);
@@ -273,11 +283,8 @@ button,select,input[type=text]{font-family:var(--mono);font-size:12px}
   background:var(--ink);border-bottom:1px solid var(--rule);
   white-space:nowrap;overflow-x:auto;
 }
-.cluster{display:flex;flex-direction:column;gap:4px;align-items:flex-start}
-.cl-k{
-  font-size:9px;letter-spacing:.16em;text-transform:uppercase;
-  color:var(--dim);padding-left:2px;
-}
+.deck{gap:10px}
+.sep{width:1px;align-self:stretch;background:var(--rule);margin:2px 2px}
 .chk{
   display:flex;align-items:center;gap:8px;
   font-size:12px;color:var(--text);cursor:pointer;
@@ -411,64 +418,46 @@ button,select,input[type=text]{font-family:var(--mono);font-size:12px}
   <button class="wallout" id="b-wallout" hidden>UN-ZOOM</button>
 
   <div class="deck">
-    <div class="cluster">
-      <span class="cl-k">Time</span>
-      <div class="seg step" title="Step back / forward in time (J / K)">
-        <button class="btn" id="b-step-back" aria-label="Step back">&#x25C0;</button>
-        <button class="btn" id="b-step-fwd" aria-label="Step forward">&#x25B6;</button>
-      </div>
-      <div class="seg">
-        <button class="btn" id="b-first" title="First frame">&#x23EE;</button>
-        <button class="btn" id="b-last" title="Last frame">&#x23ED;</button>
-      </div>
-      <div class="seg">
-        <button class="btn wide play" id="b-play" title="Play / pause (space)">PLAY</button>
-        <button class="btn" id="b-now" title="Jump to the frame nearest now (N)">NOW</button>
-      </div>
-      <span class="loadnote" id="s-load" hidden></span>
+    <div class="seg step" title="Step / jump through time (J / K)">
+      <button class="btn" id="b-first" title="First frame">&#x23EE;</button>
+      <button class="btn" id="b-step-back" aria-label="Step back">&#x25C0;</button>
+      <button class="btn" id="b-step-fwd" aria-label="Step forward">&#x25B6;</button>
+      <button class="btn" id="b-last" title="Last frame">&#x23ED;</button>
+    </div>
+    <div class="seg">
+      <button class="btn wide play" id="b-play" title="Play / pause (space)">PLAY</button>
+      <button class="btn" id="b-now" title="Jump to the frame nearest now (N)">NOW</button>
+    </div>
+    <span class="loadnote" id="s-load" hidden></span>
+
+    <span class="sep"></span>
+
+    <div class="seg" id="panelseg" title="Panels on screen">
+      <button class="btn on" data-pan="1">1</button>
+      <button class="btn" data-pan="2">2</button>
+      <button class="btn" data-pan="4">4</button>
     </div>
 
-    <div class="cluster">
-      <span class="cl-k">Panels</span>
-      <div class="seg" id="panelseg">
-        <button class="btn on" data-pan="1">1</button>
-        <button class="btn" data-pan="2">2</button>
-        <button class="btn" data-pan="4">4</button>
-      </div>
+    <div class="seg" id="spans" title="How far ahead to loop">
+      <button class="btn" id="b-span6">6 H</button>
+      <button class="btn" id="b-span12">12 H</button>
+      <button class="btn" id="b-spanfull">WHOLE</button>
+      <button class="btn" id="b-sub" title="15-minute frames">15 MIN</button>
     </div>
 
-    <div class="cluster">
-      <span class="cl-k">Span</span>
-      <div class="seg" id="spans">
-        <button class="btn" id="b-span6">6 H</button>
-        <button class="btn" id="b-span12">12 H</button>
-        <button class="btn" id="b-spanfull">WHOLE</button>
-        <button class="btn" id="b-sub" title="15-minute frames">15 MIN</button>
-      </div>
+    <div class="seg" id="rates" title="Loop speed">
+      <button class="btn" data-rate="3">SLOW</button>
+      <button class="btn" data-rate="6">MED</button>
+      <button class="btn" data-rate="12">FAST</button>
     </div>
 
-    <div class="cluster">
-      <span class="cl-k">Speed</span>
-      <div class="seg" id="rates">
-        <button class="btn" data-rate="3">SLOW</button>
-        <button class="btn" data-rate="6">MED</button>
-        <button class="btn" data-rate="12">FAST</button>
-      </div>
-    </div>
-
-    <div class="cluster">
-      <span class="cl-k">Compare</span>
-      <button class="btn cmp" id="b-cmp" title="Same valid time from the previous run (C)">VS LAST RUN</button>
-    </div>
+    <button class="btn cmp" id="b-cmp" title="Same valid time from the previous run (C)">VS LAST RUN</button>
 
     <div class="spacer"></div>
 
-    <div class="cluster">
-      <span class="cl-k">View</span>
-      <div class="seg">
-        <button class="btn ghost" id="b-wall" title="Full-screen zoom (W)">ZOOM</button>
-        <button class="btn ghost" id="b-gear" title="Settings and diagnostics">SETTINGS</button>
-      </div>
+    <div class="seg">
+      <button class="btn ghost" id="b-wall" title="Full-screen zoom (W)">ZOOM</button>
+      <button class="btn ghost" id="b-gear" title="Settings and diagnostics">SETTINGS</button>
     </div>
   </div>
 
@@ -655,7 +644,7 @@ var CFG_VERSION = 9;
 
 /* Shown in the header. If this is not the number quoted in chat, the browser or
    the Pages CDN is serving a cached copy - hard reload, or add ?v=N to the URL. */
-var BUILD = "17";
+var BUILD = "18";
 
 var BUILTIN_PRESETS = [
   { name:"NCEP MAG - HRRR CONUS", tpl:DEFAULT_TPL, model:"hrrr", area:"conus",
@@ -1109,21 +1098,24 @@ function profileMaxFH(){
 }
 
 /* Dropdown line: what it is, how far out, and the run it is tracking right now. */
+/* Short label for the closed picker; long one for the tooltip. */
 function profileLabel(pr){
   var m = modelById(pr.model);
   var kind = (pr.kind === "extended") ? m.extMaxFH : m.maxFH;
-  var days = (kind >= 48 && kind % 24 === 0) ? (" / " + (kind/24) + "d") : "";
-  var reach = "out to " + kind + "h" + days;
-  var which, cyc;
-  if(pr.kind === "hourly"){
-    which = "latest hourly run"; cyc = expectedCycle(pr);
-  } else if(pr.kind === "extended"){
-    which = "latest 00/06/12/18Z run"; cyc = expectedCycle(pr);
-  } else {
-    which = "every " + (m.cyc||6) + "h"; cyc = expectedCycle(pr);
-  }
-  var when = cyc ? ("  ~" + pad(cyc.getUTCHours(),2) + "Z") : "";
-  return m.label + " - " + reach + " - " + which + when;
+  var cyc = expectedCycle(pr);
+  var when = cyc ? (pad(cyc.getUTCHours(),2) + "Z") : "";
+  return m.label + " " + kind + "h" + (when ? (" - " + when + " run") : "");
+}
+function profileTip(pr){
+  var m = modelById(pr.model);
+  var kind = (pr.kind === "extended") ? m.extMaxFH : m.maxFH;
+  var days = (kind >= 48 && kind % 24 === 0) ? (" / " + (kind/24) + " days") : "";
+  var which = (pr.kind === "hourly") ? "latest hourly run"
+            : (pr.kind === "extended") ? "latest 00/06/12/18Z run"
+            : ("runs every " + (m.cyc||6) + "h");
+  var cyc = expectedCycle(pr);
+  var when = cyc ? ("  (~" + pad(cyc.getUTCHours(),2) + "Z now)") : "";
+  return m.label + " - out to " + kind + "h" + days + " - " + which + when;
 }
 
 /* Newest plausible cycle for a given profile, from the clock. */
@@ -1241,9 +1233,11 @@ function fillModelSelect(){
     var o = el("option");
     o.value = PROFILES[i].id;
     o.textContent = profileLabel(PROFILES[i]);
+    o.title = profileTip(PROFILES[i]);
     sel.appendChild(o);
   }
   sel.value = (S.profile || keep || "hrrr");
+  sel.title = profileTip(currentProfile());
 }
 
 function fillAreaSelect(){
