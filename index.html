@@ -683,7 +683,7 @@ var CFG_VERSION = 9;
 
 /* Shown in the header. If this is not the number quoted in chat, the browser or
    the Pages CDN is serving a cached copy - hard reload, or add ?v=N to the URL. */
-var BUILD = "30";
+var BUILD = "31";
 
 var BUILTIN_PRESETS = [
   { name:"NCEP MAG - HRRR CONUS", tpl:DEFAULT_TPL, model:"hrrr", area:"conus",
@@ -710,7 +710,7 @@ var S = {
   gen:0,
   watch:false, watchTimer:null, wall:false, migrated:false, booted:false,
   span:null, situation:null, zoom:null, sitParams:null,
-  radar:false, radarTimes:null, radarImgs:null,
+  radar:false, radarTimes:null, radarImgs:null, radarStatus:null,
   showMissing:false, stale:false, staleTimer:null, region:"conus",
   _dragging:false, _dragMoved:false, _dragStartX:0,
   profile:"hrrr", profileKind:"hourly"
@@ -2524,9 +2524,10 @@ function radarLoad(){
   S.gen++;
   var gen = S.gen;
   S.radarTimes = radarBuildTimes();
-  S.fhList = [];
-  for(var i=0;i<S.radarTimes.length;i++){ S.fhList.push(i); }   /* index list for shared bounds */
-  S.idx = S.fhList.length - 1;    /* start on the newest frame */
+  S.radarStatus = [];
+  for(var i=0;i<S.radarTimes.length;i++){ S.radarStatus.push("loading"); }
+  rebuildRadarView();                 /* fills S.fhList with visible frame indices */
+  S.idx = S.fhList.length - 1;        /* start on the newest visible frame */
   S.frames = {};
   S.loadedCount = 0; S.missingCount = 0;
 
@@ -2565,8 +2566,9 @@ function radarLoad(){
       img.onload = function(){
         if(gen !== S.gen){ return; }
         if(!img._counted){ img._counted = true; S.loadedCount++; }
-        markCell(f,"ok"); showLoading();
-        if(f === S.idx){ radarShow(S.idx); }
+        S.radarStatus[f] = "ok";
+        showLoading();
+        radarShow(S.idx);            /* refresh current view as frames arrive */
       };
       img.onerror = function(){
         if(gen !== S.gen){ return; }
@@ -2580,7 +2582,10 @@ function radarLoad(){
             "&bboxSR=3857&imageSR=3857&size=" + RADAR_W + "," + RADAR_H +
             "&format=png32&transparent=true&f=image";
         } else {
-          markCell(f,"missing"); showLoading();
+          S.radarStatus[f] = "missing";
+          S.missingCount++;
+          scheduleRadarRebuild();     /* drop this empty frame from the loop */
+          showLoading();
         }
       };
       if(holder){ holder.appendChild(img); }
@@ -2601,47 +2606,72 @@ function radarLoad(){
   radarShow(S.idx);
 }
 
+/* Frames to include: everything except confirmed-missing, unless the
+   "show missing" setting is on (same toggle the forecast strip uses). */
+function rebuildRadarView(){
+  var out = [];
+  for(var i=0;i<S.radarTimes.length;i++){
+    if(S.showMissing || S.radarStatus[i] !== "missing"){ out.push(i); }
+  }
+  if(!out.length){ out = [S.radarTimes.length - 1]; }   /* never fully empty */
+  S.fhList = out;
+}
+
+var _radarRebuildTimer = null;
+function scheduleRadarRebuild(){
+  if(_radarRebuildTimer){ return; }
+  _radarRebuildTimer = setTimeout(function(){
+    _radarRebuildTimer = null;
+    var curRi = S.fhList[S.idx];          /* remember the frame we are on */
+    rebuildRadarView();
+    /* keep the cursor on the same frame if it survived, else clamp */
+    var pos = S.fhList.indexOf(curRi);
+    S.idx = (pos >= 0) ? pos : Math.min(S.idx, S.fhList.length - 1);
+    radarBuildStrip();
+    radarShow(S.idx);
+  }, 300);
+}
+
 function radarBuildStrip(){
   var bay = $("bay");
   if(!bay){ return; }
   bay.innerHTML = "";
-  for(var i=0;i<S.radarTimes.length;i++){
-    (function(i){
-      var d = new Date(S.radarTimes[i]);
+  for(var pos=0;pos<S.fhList.length;pos++){
+    (function(pos){
+      var ri = S.fhList[pos];
+      var d = new Date(S.radarTimes[ri]);
       var c = el("button","cell");
-      c.setAttribute("data-i", String(i));
-      var a = el("div","cell-fh"); a.textContent = zShort(d);           /* HHZ */
+      c.setAttribute("data-i", String(pos));
+      var a = el("div","cell-fh"); a.textContent = zShort(d);
       var b = el("div","cell-z");  b.textContent = pad(d.getUTCMinutes(),2) + "m";
       var s = el("div","cell-state");
-      c.title = zLabel(d) + "  " + etLabel(d);
+      c.title = zLabel(d) + "  " + etLabel(d) +
+        (S.radarStatus[ri] === "missing" ? "  (no image)" : "");
+      if(S.radarStatus[ri] === "missing"){ c.className += " gap"; }
       if(Math.abs(d.getTime() - Date.now()) < 3*60000){ c.className += " now"; }
       c.appendChild(a); c.appendChild(b); c.appendChild(s);
-      c.addEventListener("click", function(){ if(S._dragMoved){ return; } stop(); radarShow(i); });
+      c.addEventListener("click", function(){ if(S._dragMoved){ return; } stop(); radarShow(pos); });
       bay.appendChild(c);
-    })(i);
+    })(pos);
   }
 }
 
 function radarShow(i){
-  if(!S.radarTimes || !S.radarTimes.length){ return; }
-  if(i < 0){ i = S.radarTimes.length - 1; }
-  if(i >= S.radarTimes.length){ i = 0; }
+  if(!S.fhList || !S.fhList.length){ return; }
+  if(i < 0){ i = S.fhList.length - 1; }
+  if(i >= S.fhList.length){ i = 0; }
   S.idx = i;
+  var ri = S.fhList[i];             /* actual radarTimes index for this position */
 
   var pane = document.querySelector('.pane[data-p="0"]');
   if(pane){
     var frames = pane.querySelectorAll(".radar-frame");
-    var found = false;
     for(var k=0;k<frames.length;k++){
-      var on = (parseInt(frames[k].getAttribute("data-ri"),10) === i);
+      var on = (parseInt(frames[k].getAttribute("data-ri"),10) === ri);
       frames[k].className = "radar-frame" + (on ? " on" : "");
-      if(on){ found = true; }
     }
     var em = $("empty-0");
-    if(em){
-      var loaded = frames.length && found;
-      em.style.display = "none";   /* radar shows base even if a frame is missing */
-    }
+    if(em){ em.style.display = "none"; }   /* base always shows behind */
   }
 
   /* strip cursor */
@@ -2659,16 +2689,16 @@ function radarShow(i){
     cells[q].className = cl;
   }
 
-  var d = new Date(S.radarTimes[i]);
+  var d = new Date(S.radarTimes[ri]);
   setStatus("s-validline", longValid(d));
   setStatus("s-frames", S.loadedCount + " / " + S.radarTimes.length);
   showLoading();
 }
 
 function radarNow(){
-  if(!S.radarTimes || !S.radarTimes.length){ return; }
+  if(!S.fhList || !S.fhList.length){ return; }
   stop();
-  radarShow(S.radarTimes.length - 1);
+  radarShow(S.fhList.length - 1);
 }
 
 /* ============================================================
@@ -2968,7 +2998,9 @@ function initInner(){
   $("b-wallout").addEventListener("click", function(){ setWall(false); });
   $("i-showmissing").addEventListener("change", function(){
     S.showMissing = this.checked;
-    persist(); writeHash(); rebuildStrip();
+    persist(); writeHash();
+    if(S.radar){ rebuildRadarView(); radarBuildStrip(); radarShow(S.idx); }
+    else { rebuildStrip(); }
   });
   $("b-gear").addEventListener("click", function(){
     var d = $("drawer");
