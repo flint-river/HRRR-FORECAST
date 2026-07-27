@@ -277,10 +277,9 @@ button,select,input[type=text]{font-family:var(--mono);font-size:12px}
 .chip.sit:hover{color:var(--text)}
 .chip.sit.on{color:var(--amber);border-bottom-color:var(--amber)}
 .validbar{
-  flex:0 0 auto;text-align:center;
+  flex:1 1 auto;text-align:left;
   font-family:var(--mono);font-size:17px;letter-spacing:.02em;
-  color:var(--cyan);padding:10px 12px;
-  background:var(--ink);border-bottom:1px solid var(--rule);
+  color:var(--cyan);padding:2px 4px;
   white-space:nowrap;overflow-x:auto;
 }
 .deck{gap:10px}
@@ -401,18 +400,8 @@ button,select,input[type=text]{font-family:var(--mono);font-size:12px}
 
   <div class="subtabs" id="subtabs" hidden></div>
 
-  <div class="validbar" id="s-validline">&mdash;</div>
-
   <div class="bar">
-    <div class="slug">
-      <span class="slug-k">Forecast hour</span>
-      <span class="slug-v" id="s-fh">&mdash;</span>
-    </div>
-    <div class="slug">
-      <span class="slug-k">Run cycle</span>
-      <span class="slug-v amber" id="s-run">&mdash;</span>
-      <span class="slug-sub" id="s-runsub">detecting</span>
-    </div>
+    <div class="validbar" id="s-validline">&mdash;</div>
     <div class="spacer"></div>
     <span class="flag stale" id="s-stale" hidden>OLD DATA &mdash; CHECK RUN</span>
     <span class="flag watch" id="s-watch" hidden>AUTO-ADVANCE-ON</span>
@@ -646,7 +635,7 @@ var CFG_VERSION = 9;
 
 /* Shown in the header. If this is not the number quoted in chat, the browser or
    the Pages CDN is serving a cached copy - hard reload, or add ?v=N to the URL. */
-var BUILD = "21";
+var BUILD = "22";
 
 var BUILTIN_PRESETS = [
   { name:"NCEP MAG - HRRR CONUS", tpl:DEFAULT_TPL, model:"hrrr", area:"conus",
