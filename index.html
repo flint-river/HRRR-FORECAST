@@ -73,6 +73,7 @@ body{
 .app.radar-mode #panelseg,
 .app.radar-mode #b-cmp{display:none}
 .app.radar-mode #b-radar{background:var(--cyan);border-color:var(--cyan);color:var(--ink)}
+.app.radar-mode .pane{background:#0d1b2a}
 .radar-base{position:absolute;inset:0;margin:auto;max-width:100%;max-height:100%;
   transform:scale(var(--zscale,1));transform-origin:var(--zx,50%) var(--zy,50%)}
 .radar-frame{position:absolute;inset:0;margin:auto;max-width:100%;max-height:100%;
@@ -681,7 +682,7 @@ var CFG_VERSION = 9;
 
 /* Shown in the header. If this is not the number quoted in chat, the browser or
    the Pages CDN is serving a cached copy - hard reload, or add ?v=N to the URL. */
-var BUILD = "26";
+var BUILD = "27";
 
 var BUILTIN_PRESETS = [
   { name:"NCEP MAG - HRRR CONUS", tpl:DEFAULT_TPL, model:"hrrr", area:"conus",
@@ -2459,7 +2460,7 @@ var RADAR_IMG_URL =
 /* CONUS-ish extent in Web Mercator (3857); ratio ~1.72 */
 var RADAR_BBOX = [-14200000, 2600000, -7500000, 6500000];
 var RADAR_W = 1200, RADAR_H = 700;
-var RADAR_STEP_MIN = 5;
+var RADAR_STEP_MIN = 10;    /* MRMS refreshes ~every 10 min */
 var RADAR_SPAN_MIN = 240;   /* last 4 hours */
 
 function radarBaseUrl(){
@@ -2467,7 +2468,9 @@ function radarBaseUrl(){
     "bbox=" + RADAR_BBOX.join(","),
     "bboxSR=3857","imageSR=3857",
     "size=" + RADAR_W + "," + RADAR_H,
-    "format=png24","transparent=false","f=image"
+    "format=png32","transparent=true",
+    "layers=show:3,2",          /* 3 = state borders, 2 = county borders */
+    "dpi=96","f=image"
   ];
   return RADAR_BASE_URL + "?" + q.join("&");
 }
@@ -2485,7 +2488,8 @@ function radarImgUrl(epochMs){
 function radarBuildTimes(){
   /* align "now" down to the step so timestamps are clean */
   var stepMs = RADAR_STEP_MIN * 60000;
-  var end = Math.floor(Date.now() / stepMs) * stepMs;
+  /* back off one step: the current instant is usually not published yet */
+  var end = Math.floor(Date.now() / stepMs) * stepMs - stepMs;
   var start = end - RADAR_SPAN_MIN * 60000;
   var out = [];
   for(var t = start; t <= end; t += stepMs){ out.push(t); }
