@@ -67,6 +67,15 @@ body{
 .stage.p2{grid-template-columns:1fr 1fr;grid-template-rows:1fr}
 .stage.p4{grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr}
 .stage.zoom{grid-template-columns:1fr !important;grid-template-rows:1fr !important}
+.app.stale-run .stage{outline:3px solid var(--red);outline-offset:-3px}
+.staleband{
+  position:absolute;top:0;left:0;right:0;z-index:20;
+  background:var(--red);color:#fff;text-align:center;
+  font-family:var(--mono);font-size:12px;letter-spacing:.1em;
+  padding:5px 8px;pointer-events:none;
+}
+.staleband[hidden]{display:none}
+.stagewrap{position:relative;flex:1 1 auto;min-height:0;display:flex}
 .stage.zoom .pane{display:none}
 .stage.zoom .pane.zoomed{display:block}
 .pane.zoomable{cursor:zoom-in}
@@ -102,6 +111,13 @@ body{
   font-family:var(--mono);font-size:12px;color:var(--dim);
 }
 .pane-empty b{color:var(--red);font-weight:400}
+.pane-empty.loading b{display:none}
+.spin{
+  width:26px;height:26px;border-radius:50%;
+  border:3px solid var(--rule);border-top-color:var(--amber);
+  animation:spin .8s linear infinite;
+}
+@keyframes spin{to{transform:rotate(360deg)}}
 
 /* ---------- strip bay ---------- */
 .bay{
@@ -413,7 +429,10 @@ button,select,input[type=text]{font-family:var(--mono);font-size:12px}
     </span>
   </div>
 
-  <main class="stage p1" id="stage"></main>
+  <div class="stagewrap">
+    <div class="staleband" id="s-staleband" hidden>OLD DATA &mdash; THIS RUN IS OUT OF DATE, CHECK THE CYCLE BEFORE BRIEFING</div>
+    <main class="stage p1" id="stage"></main>
+  </div>
 
   <div class="bay" id="bay-wrap"><div class="bay-scroll" id="bay"></div></div>
 
@@ -639,7 +658,7 @@ var CFG_VERSION = 9;
 
 /* Shown in the header. If this is not the number quoted in chat, the browser or
    the Pages CDN is serving a cached copy - hard reload, or add ?v=N to the URL. */
-var BUILD = "23";
+var BUILD = "24";
 
 var BUILTIN_PRESETS = [
   { name:"NCEP MAG - HRRR CONUS", tpl:DEFAULT_TPL, model:"hrrr", area:"conus",
@@ -666,7 +685,7 @@ var S = {
   gen:0,
   watch:false, watchTimer:null, wall:false, migrated:false, booted:false,
   span:null, situation:null, zoom:null, sitParams:null,
-  showMissing:false,
+  showMissing:false, stale:false, staleTimer:null,
   _dragging:false, _dragMoved:false, _dragStartX:0,
   profile:"hrrr", profileKind:"hourly"
 };
@@ -833,9 +852,7 @@ function verifyAge(cycle){
     sub.textContent = "server time";
     /* published far later than its own cycle hour means it is a previous day */
     var lag = (mod.getTime() - cycle.getTime())/3600000;
-    var stale = (lag > 6 || lag < -1);
-    $("s-stale").hidden = !stale;
-    if(stale){
+    if(lag > 6 || lag < -1){
       setProbe("bad","This cycle hour is serving a run published " + Math.round(lag) +
         " h after its nominal time, which almost certainly means it is yesterday's run " +
         "at this hour. Step back a cycle, or raise the publish lag.");
@@ -853,6 +870,7 @@ function useCycle(c){
   if($("i-modelsel")){ fillModelSelect(); }
   var age = Math.round((Date.now() - c.getTime())/60000);
   setStatus("s-runsub", "cycle +" + age + " min");
+  if(typeof checkStale === "function"){ checkStale(); }
   clampRange();
   loadAll();
 }
@@ -1589,14 +1607,22 @@ function show(i){
     var em = $("empty-"+p);
     if(em){
       em.style.display = found ? "none" : "flex";
-      if(!found && !paramFor(p)){
-        em.innerHTML = "<b>NO PRODUCT</b><span>Choose a product for panel " + (p+1) +
-                       " in the drawer below.</span>";
-      } else if(!found){
+      if(!found){
         var rec = S.frames[want];
-        var u = em.querySelector(".u");
-        if(!u){ u = el("div","u"); em.appendChild(u); }
-        u.textContent = rec ? rec.url : buildUrl(fh, paramFor(p), S.cycle || new Date());
+        if(!paramFor(p)){
+          em.className = "pane-empty";
+          em.innerHTML = "<b>NO PRODUCT</b><span>Choose a product for panel " + (p+1) +
+                         " in the drawer below.</span>";
+        } else if(!rec || rec.status === "loading"){
+          em.className = "pane-empty loading";
+          em.innerHTML = "<div class=\"spin\"></div><span>Loading&hellip;</span>";
+        } else {
+          em.className = "pane-empty";
+          em.innerHTML = "<b>NO IMAGE</b><span>Nothing published at this hour.</span>";
+          var u = el("div","u");
+          u.textContent = rec ? rec.url : buildUrl(fh, paramFor(p), S.cycle || new Date());
+          em.appendChild(u);
+        }
       }
     }
   }
@@ -2293,6 +2319,50 @@ function scheduleStripRebuild(){
 }
 
 /* ============================================================
+   stale-run hard stop
+
+   Clock-based, so it works even when the cross-origin Last-Modified read is
+   blocked. If the run being viewed is older than a couple of the model's own
+   cycle intervals past its expected publish time, the map gets a red frame and
+   an unmissable banner - you should not brief off it without checking.
+   ============================================================ */
+function staleThresholdMin(){
+  /* newest run is ~latency old when it appears; allow two more cycles before
+     calling it stale, plus a half-hour margin. */
+  return latencyMin() + 2 * cycleStepH() * 60 + 30;
+}
+
+function checkStale(){
+  if(!S.cycle){ setStale(false, 0); return; }
+  var ageMin = Math.round((Date.now() - S.cycle.getTime()) / 60000);
+  var stale = ageMin > staleThresholdMin();
+  setStale(stale, ageMin);
+}
+
+function setStale(on, ageMin){
+  S.stale = on;
+  var app = $("app");
+  if(app){ app.className = app.className.replace(/\s*stale-run/g,"") + (on ? " stale-run" : ""); }
+  var flag = $("s-stale");
+  if(flag){
+    flag.hidden = !on;
+    if(on){
+      var h = Math.floor(ageMin/60), m = ageMin % 60;
+      var age = h ? (h + "h " + m + "m") : (m + "m");
+      flag.textContent = "OLD DATA - RUN IS " + age + " OLD";
+    }
+  }
+  var rib = $("s-staleband");
+  if(rib){ rib.hidden = !on; }
+}
+
+function startStaleWatch(){
+  if(S.staleTimer){ clearInterval(S.staleTimer); }
+  S.staleTimer = setInterval(checkStale, 60000);
+  checkStale();
+}
+
+/* ============================================================
    verification
    ============================================================ */
 function setProbe(cls,html){
@@ -2621,6 +2691,7 @@ function initInner(){
     clampRange();
     loadAll();
     verifyAge(S.cycle);
+    checkStale();
   });
 
   var pans = document.querySelectorAll("[data-pan]");
@@ -2662,6 +2733,7 @@ function initInner(){
   markRate();
   applyZoom();
   var firstVisit = !store.get("hrrrloop.cfg");
+  startStaleWatch();
   S.booted = true;
   if(needDefaults){ applyModel(currentModel().id, false); }
   else { detectLatest(); }
